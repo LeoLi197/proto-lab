@@ -1,0 +1,15 @@
+{
+  "name": "⚙️ Gemini 功能开发样板",
+  "version": "1.0.0",
+  "author": "flashmvp Framework",
+  "description": "【开发者专用】提供一个调用 Gemini 服务的最小化代码范例，可作为新功能开发的起点。",
+  "defaultModel": {
+    "provider": "gemini",
+    "model": "gemini-2.5-flash"
+  },
+  "allowModelSelection": false,
+  "features": {
+    "requiresAuth": true,
+    "trackUsage": true
+  }
+}

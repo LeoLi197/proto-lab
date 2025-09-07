@@ -1,0 +1,142 @@
+# .gitignore
+# ==============================================================================
+# flashmvp Git Ignore Rules
+# ==============================================================================
+# This file specifies intentionally untracked files that Git should ignore.
+
+# Python
+# ------------------------------------------------------------------------------
+# Virtual environment directories, must be ignored
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache files and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Dependency management lock files (if you use these tools)
+Pipfile.lock
+poetry.lock
+
+
+# Cloudflare
+# ------------------------------------------------------------------------------
+# Cloudflare Wrangler's local development and state directory
+.wrangler/
+.dev.vars
+
+
+# Vercel (Kept for safety in case vercel CLI is used by mistake)
+# ------------------------------------------------------------------------------
+# Vercel platform's local development directory
+.vercel
+.vercel_build_output/
+
+
+# Environment Variables
+# ------------------------------------------------------------------------------
+# Ignore all local environment files. Only templates should be committed.
+.env
+.env.*
+.env.local
+!*.env.example
+!*.env.local.example
+
+
+# IDE & Editor Configuration
+# ------------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+
+
+# Operating System Generated Files
+# ------------------------------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+
+# Log Files
+# ------------------------------------------------------------------------------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+deployment-logs/ # <<< 新增：忽略部署脚本生成的日志目录
+
+
+# Script Bundles & Temporary Outputs
+# ------------------------------------------------------------------------------
+# [MODIFIED] Ignore the entire directory used for storing generated bundle files.
+project_bundles/
+
+gemini_project_bundle_*.txt
+bundle_output_*.txt
+bundle_project_*.txt
+flashmvp_project_bundle_*.txt # <<< 新增：忽略flashmvp项目打包脚本的输出文件
+.last-deployment.json # <<< 新增：忽略部署脚本生成的最新部署信息文件
+*.tmp
+*.temp
+.cache/
+dist/
+build/
+
+
+# Test & Coverage Reports
+# ------------------------------------------------------------------------------
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.pytest_cache/
+
+
+# Miscellaneous
+# ------------------------------------------------------------------------------
+# Backup files created by some editors
+*.bak
+*.orig
+
+# ==============================================================================
+# flashmvp Internal & Process Documentation
+# ==============================================================================
+# Exclude detailed setup guides, internal reports, and deep-dive technical
+# articles that are better suited for a wiki or blog.
+
+# Deployment and setup guides
+flashmvp 自动化部署与开发工作流指南.md
+flashmvp 部署快速参考卡-quick-reference-card.md
+登录命令.md
+
+# Internal development standards
+frontend/flashmvp-feature-guide.md
+
+# Internal analysis reports and deep-dive technical docs in /docs
+docs/init_deploy.sh 合规性与最佳实践分析报告.md
+docs/gcp-github-actions-workload-identity-federation-gcloud-guide.md
+docs/针对 GitHub Actions 的 GCP Workload Identity Federation 权威配置指南.md
+
+# ==============================================================================
+# Auto-generated files by init_deploy.sh (DO NOT COMMIT)
+# ==============================================================================
+# These files are generated dynamically based on the user's environment
+# and contain sensitive or session-specific information.
+manual-setup-guide.md
+deployment-config.txt
+setup_gcp_identity.sh

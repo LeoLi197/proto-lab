@@ -1,0 +1,140 @@
+<!-- Path: frontend/features/boilerplate-gemini/index.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <title>Gemini 功能开发样板 - flashmvp</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="../../style.css">
+    <link rel="icon" href="../../public/favicon.ico">
+</head>
+<body>
+    <div class="feature-container">
+        <header>
+            <h1>Gemini 功能开发样板</h1>
+            <p>此页面提供了一个调用 Gemini 服务的最小化代码范例。您可以复制此文件的内容作为开发新功能的起点。</p>
+        </header>
+
+        <main>
+            <!-- 输入区 -->
+            <section class="panel">
+                <h2>试一试</h2>
+                <p>请输入一句话，我们将通过后端 API 网关请求 Gemini，并返回结果。</p>
+
+                <div class="form-row">
+                    <label for="userInput">你的输入：</label>
+                    <textarea id="userInput" rows="4" placeholder="例如：给我一句鼓励的话"></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button id="submitBtn" onclick="handleSubmit()">调用AI</button>
+                </div>
+            </section>
+
+            <!-- 结果区 -->
+            <div id="result" class="result-box" style="display: none;">
+                <!-- AI 响应将在此处显示 -->
+            </div>
+        </main>
+        
+        <footer>
+            <a href="../../dashboard.html">← 返回功能中心</a>
+        </footer>
+    </div>
+    
+    <!-- 引入平台必需的全局脚本 -->
+    <script src="../../config.js"></script>
+    <script src="../../auth.js"></script>
+    <script src="../../models.js"></script>
+    <script src="../../usage.js"></script>
+    
+    <!-- 功能专属的交互逻辑 -->
+    <script>
+        // ==============================================================================
+        // flashmvp 功能开发核心流程 (Gemini 范例)
+        // 遵循《flashmvp 功能模块开发指南》
+        // ==============================================================================
+
+        // 步骤 1: 【必需】认证检查
+        // 在执行任何业务逻辑之前，必须调用 checkAuth() 函数。
+        // 它会验证用户登录状态，如果未登录，将自动跳转到登录页。
+        checkAuth();
+        
+        // --- 主要业务逻辑 ---
+        async function handleSubmit() {
+            const userInput = document.getElementById('userInput').value.trim();
+            if (!userInput) {
+                alert('请输入内容后再提交。');
+                return;
+            }
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const resultDiv = document.getElementById('result');
+            
+            // UI状态管理：进入加载状态
+            submitBtn.disabled = true;
+            submitBtn.textContent = '处理中...';
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'AI正在思考，请稍候...';
+
+            try {
+                // 步骤 2: 统计用量（可选，若可用 trackUsage）
+                // 说明：usageTracker 会在 _worker.js 的 /api/track-usage 上报 D1。
+                // 若你不需要统计，可以移除这段。
+                if (window.usageTracker) {
+                    usageTracker.track({
+                        feature: 'boilerplate-gemini',
+                        action: 'request',
+                        tokens: 0
+                    });
+                }
+
+                // 步骤 3: 通过后端 API 网关调用 Gemini 服务
+                // 网关会统一处理鉴权、路由与不同模型供应商的差异。
+                // 使用 Gemini 2.5 Flash 作为默认模型
+                const apiKeyTier = localStorage.getItem('proto-lab_api_key_tier') || 'free';
+                const resp = await fetch('/api/ai-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        provider: 'gemini',
+                        model: 'gemini-2.5-flash', // 使用 Gemini 2.5 Flash
+                        prompt: userInput,
+                        apiKeyTier: apiKeyTier
+                    })
+                });
+
+                if (!resp.ok) {
+                    const text = await resp.text().catch(() => '');
+                    throw new Error(`后端返回错误状态码 ${resp.status}: ${text}`);
+                }
+
+                const data = await resp.json();
+
+                // 步骤 4: （可选）统计用量结果
+                if (window.usageTracker && data) {
+                    // 记录使用量
+                    await usageTracker.recordUsage(
+                        'Gemini 功能开发样板',
+                        'gemini',
+                        'gemini-2.5-flash',
+                        data.inputTokens || 100,
+                        data.outputTokens || 200
+                    );
+                }
+
+                // 在UI上显示最终结果
+                resultDiv.innerText = data.response || '无响应内容';
+                
+            } catch (error) {
+                console.error('API 调用失败:', error);
+                resultDiv.innerHTML = `<strong style="color:red;">处理失败：</strong> ${error.message}`;
+            } finally {
+                // UI状态管理：无论成功或失败，最后都恢复初始状态
+                submitBtn.disabled = false;
+                submitBtn.textContent = '调用AI';
+            }
+        }
+    </script>
+</body>
+</html>

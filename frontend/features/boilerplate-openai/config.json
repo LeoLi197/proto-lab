@@ -1,0 +1,15 @@
+{
+  "name": "⚙️ OpenAI 功能开发样板",
+  "version": "1.0.0",
+  "author": "flashmvp Framework",
+  "description": "【开发者专用】提供调用 OpenAI 服务的最小化代码范例，展示了框架的多供应商支持能力。",
+  "defaultModel": {
+    "provider": "openai",
+    "model": "gpt-3.5-turbo"
+  },
+  "allowModelSelection": false,
+  "features": {
+    "requiresAuth": true,
+    "trackUsage": true
+  }
+}

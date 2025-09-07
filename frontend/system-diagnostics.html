@@ -1,0 +1,169 @@
+<!-- Path: frontend/system-diagnostics.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <title>系统诊断面板 - flashmvp</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .diagnostics-container { max-width: 1200px; margin: 30px auto; padding: 20px; }
+        .diagnostics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .diagnostics-section { background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 25px; }
+        .diagnostics-section h2 { margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .test-item { display: flex; align-items: center; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #f0f0f0; }
+        .test-item:last-child { border-bottom: none; }
+        .test-name { font-weight: 500; }
+        .test-status { display: flex; align-items: center; gap: 8px; }
+        .status-badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+        .status-success { background: #e8f5e9; color: #388e3c; }
+        .status-error { background: #ffebee; color: #d32f2f; }
+        .status-pending { background: #e3f2fd; color: #1e88e5; }
+        .status-running { background: #fffde7; color: #fbc02d; }
+        .test-details { font-size: 12px; color: #888; margin-top: 5px; cursor: pointer; }
+        .response-modal { display: none; /* ... modal styles ... */ }
+        pre { background-color: #f5f5f5; padding: 15px; border-radius: 5px; white-space: pre-wrap; margin-top: 10px; max-height: 300px; overflow-y: auto;}
+    </style>
+</head>
+<body>
+    <div class="diagnostics-container">
+        <header>
+            <h1>系统诊断面板</h1>
+            <div>
+                <button onclick="runAllTests()">🚀 运行所有诊断</button>
+                <button onclick="window.location.href='dashboard.html'" style="background: #6c757d; margin-left: 10px;">返回功能中心</button>
+            </div>
+        </header>
+
+        <div class="diagnostics-grid">
+            <section class="diagnostics-section" id="infra-tests">
+                <h2>基础设施连通性</h2>
+                <!-- Infrastructure tests will be dynamically generated here -->
+            </section>
+            <section class="diagnostics-section" id="external-tests">
+                <h2>Gemini 2.5 服务连通性</h2>
+                <!-- External service tests will be dynamically generated here -->
+            </section>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script src="models.js"></script>
+    <script>
+        checkAuth();
+
+        const infraTests = [
+            { id: 'health', name: '后端健康检查 (/api/health)', url: '/api/health' },
+            { id: 'version', name: '后端版本信息 (/api/version)', url: '/api/version' }
+        ];
+
+        // Only test Gemini 2.5 models
+        const externalTests = [
+            {
+                id: 'gemini-2.5-pro',
+                name: 'Gemini 2.5 Pro',
+                config: { provider: 'gemini', model: 'gemini-2.5-pro', prompt: 'Hi' }
+            },
+            {
+                id: 'gemini-2.5-flash',
+                name: 'Gemini 2.5 Flash',
+                config: { provider: 'gemini', model: 'gemini-2.5-flash', prompt: 'Hi' }
+            },
+            {
+                id: 'gemini-2.5-flash-lite',
+                name: 'Gemini 2.5 Flash-Lite',
+                config: { provider: 'gemini', model: 'gemini-2.5-flash-lite', prompt: 'Hi' }
+            }
+        ];
+
+        function renderTestItems() {
+            const infraContainer = document.getElementById('infra-tests');
+            infraContainer.innerHTML = '<h2>基础设施连通性</h2>' + infraTests.map(t => createTestItemHTML(t.id, t.name)).join('');
+
+            const externalContainer = document.getElementById('external-tests');
+            externalContainer.innerHTML = '<h2>Gemini 2.5 服务连通性</h2>' + externalTests.map(t => createTestItemHTML(t.id, t.name)).join('');
+        }
+
+        function createTestItemHTML(id, name) {
+            return `
+                <div class="test-item" id="test-${id}">
+                    <div class="test-name">${name}</div>
+                    <div class="test-status">
+                        <span id="status-${id}" class="status-badge status-pending">待测试</span>
+                        <span id="latency-${id}" class="test-details"></span>
+                    </div>
+                </div>
+                <pre id="response-${id}" style="display:none;"></pre>
+            `;
+        }
+        
+        function updateTestStatus(id, status, text, latency = null) {
+            const statusEl = document.getElementById(`status-${id}`);
+            const latencyEl = document.getElementById(`latency-${id}`);
+            statusEl.className = `status-badge status-${status}`;
+            statusEl.textContent = text;
+            latencyEl.textContent = latency ? `${latency}ms` : '';
+        }
+
+        async function runInfraTest(test) {
+            updateTestStatus(test.id, 'running', '测试中...');
+            const startTime = Date.now();
+            try {
+                const response = await fetch(test.url);
+                const latency = Date.now() - startTime;
+                const data = await response.json();
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                updateTestStatus(test.id, 'success', '成功', latency);
+                const responseEl = document.getElementById(`response-${test.id}`);
+                responseEl.textContent = JSON.stringify(data, null, 2);
+                responseEl.style.display = 'block';
+
+            } catch (error) {
+                const latency = Date.now() - startTime;
+                updateTestStatus(test.id, 'error', '失败', latency);
+                document.getElementById(`response-${test.id}`).textContent = error.message;
+            }
+        }
+
+        async function runExternalTest(test) {
+            updateTestStatus(test.id, 'running', '测试中...');
+            const startTime = Date.now();
+            try {
+                const apiKeyTier = localStorage.getItem('mybazi_api_key_tier') || 'free';
+                const response = await fetch('/api/ai-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...test.config, apiKeyTier })
+                });
+                const latency = Date.now() - startTime;
+                const data = await response.json();
+
+                if (!response.ok || !data.success) throw new Error(data.detail || data.error || '未知错误');
+
+                updateTestStatus(test.id, 'success', '成功', latency);
+                const responseEl = document.getElementById(`response-${test.id}`);
+                // Improved: Safe handling of data.response
+                const snippet = (data && data.response) ? String(data.response).substring(0, 100) : JSON.stringify(data);
+                responseEl.textContent = `模型响应: ${snippet}...`;
+                responseEl.style.display = 'block';
+
+            } catch (error) {
+                const latency = Date.now() - startTime;
+                updateTestStatus(test.id, 'error', '失败', latency);
+                const responseEl = document.getElementById(`response-${test.id}`);
+                responseEl.textContent = `错误: ${error.message}`;
+                responseEl.style.display = 'block';
+            }
+        }
+
+        async function runAllTests() {
+            for (const test of infraTests) await runInfraTest(test);
+            for (const test of externalTests) await runExternalTest(test);
+        }
+
+        document.addEventListener('DOMContentLoaded', renderTestItems);
+    </script>
+</body>
+</html>

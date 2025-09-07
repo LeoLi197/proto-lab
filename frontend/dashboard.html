@@ -1,0 +1,106 @@
+<!-- Path: frontend/dashboard.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <title>功能中心 - flashmvp</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="dashboard">
+        <header>
+            <h1>功能中心</h1>
+
+            <div class="api-key-selector">
+                <label for="apiKeySelector">选择AI版本：</label>
+                <select id="apiKeySelector">
+                    <option value="free">免费版 (速度较慢，有调用限制)</option>
+                    <option value="paid">付费版 (高速稳定，无限制)</option>
+                </select>
+            </div>
+
+            <div>
+                <!-- [修改] 增加了系统诊断面板的链接 -->
+                <button onclick="window.location.href='system-diagnostics.html'" style="background: #ffc107; color: #333; margin-right: 10px;">系统诊断</button>
+                <button onclick="window.location.href='usage-dashboard.html'" style="background: #17a2b8; margin-right: 10px;">AI使用统计</button>
+                <button onclick="logout()">退出</button>
+            </div>
+        </header>
+        <div id="features-grid" class="features-grid">
+            <!-- 功能卡片将通过JS动态生成 -->
+        </div>
+    </div>
+    
+    <!-- Scripts are loaded at the end of the body -->
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+    
+    <script>
+        // 检查登录状态
+        checkAuth();
+        
+        const API_KEY_TIER_STORAGE_KEY = 'proto-lab_api_key_tier'; // Renamed for consistency
+        const apiKeySelector = document.getElementById('apiKeySelector');
+
+        // 页面加载时，从localStorage恢复用户的选择
+        function loadApiKeyPreference() {
+            const savedTier = localStorage.getItem(API_KEY_TIER_STORAGE_KEY) || 'free';
+            apiKeySelector.value = savedTier;
+        }
+
+        // 监听选择器变化，并保存到localStorage
+        apiKeySelector.addEventListener('change', (e) => {
+            const selectedTier = e.target.value;
+            localStorage.setItem(API_KEY_TIER_STORAGE_KEY, selectedTier);
+            alert(`已切换到 ${e.target.options[e.target.selectedIndex].text}。后续所有功能将使用此版本。`);
+        });
+
+        // 生成功能卡片
+        function generateFeatureCards() {
+            const grid = document.getElementById('features-grid');
+            // FEATURES is defined in config.js
+            FEATURES.forEach(feature => {
+                const card = document.createElement('div');
+                card.className = 'feature-card';
+                
+                const featureUrl = feature.isFullPath 
+                    ? `features/${feature.path}` 
+                    : `features/${feature.path}/index.html`;
+                
+                card.innerHTML = `
+                    <h3>${feature.name}</h3>
+                    <p>${feature.description}</p>
+                    <a href="${featureUrl}" class="feature-link">进入</a>
+                `;
+                grid.appendChild(card);
+            });
+        }
+        
+        // Initial setup on page load
+        loadApiKeyPreference();
+        generateFeatureCards();
+    </script>
+    
+    <style>
+        .api-key-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: #f0f2f5;
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+        .api-key-selector label {
+            font-size: 14px;
+            color: #333;
+        }
+        .api-key-selector select {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+</body>
+</html>

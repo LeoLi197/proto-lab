@@ -1,0 +1,15 @@
+# frontend/wrangler.toml
+# This is the configuration file for the Cloudflare Wrangler CLI.
+# It defines the project name, settings, and bindings for your Cloudflare Pages deployment.
+
+# The name of your Cloudflare Pages project.
+# This will be used in the URL: https://<name>.pages.dev
+name = "proto-lab"
+
+# Specifies that this is a Pages project and where the static assets are located.
+# For a pure static site without a build step, "." means the root of the 'frontend' directory.
+pages_build_output_dir = "."
+
+# Compatibility date ensures your script runs against a stable version of the Workers runtime.
+# It's recommended to update this periodically.
+compatibility_date = "2024-03-01"

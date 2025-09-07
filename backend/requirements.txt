@@ -1,0 +1,28 @@
+# backend/requirements.txt
+# This file contains ALL dependencies for the backend, with pinned versions for stable builds.
+
+# --- Core Platform Dependencies ---
+# These are essential for FastAPI framework operation
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+requests==2.31.0
+pydantic==2.7.1
+python-multipart==0.0.9  # Required for file uploads
+
+# ==============================================================================
+# [示例] 如何为您的功能添加 Python 依赖
+# ------------------------------------------------------------------------------
+# 如果您的新功能需要用到特定的 Python 库 (例如 pandas, PyPDF2),
+# 请将它们添加到此文件中，建议固定版本号以确保部署稳定。
+#
+# pandas==2.2.2
+# ==============================================================================
+#
+# --- [已移除功能的示例依赖] ---
+# PyMuPDF==1.24.1 # Dependency for PDF processing (used by the bank_statement_analyzer feature)
+
+
+# --- Optional: Enhanced PDF to Image (if needed later) ---
+# Note: pdf2image requires system-level poppler-utils installation
+# Uncomment only if high-quality PDF rendering is required:
+# pdf2image==1.16.3
