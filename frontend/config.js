@@ -58,5 +58,11 @@ const FEATURES = [
         name: '⚙️ OpenAI 功能开发样板',
         description: '【开发者专用】提供调用 OpenAI 服务的最小代码范例，展示了框架的多供应商支持能力。',
         isFullPath: true
-    }
+    },
+    {
+        path: 'doc-converter/index.html', // 路径相对于 frontend/features/
+        name: '高性能文档转换器',
+        description: '上传PDF, DOCX等多种文档，通过基础或AI增强引擎，将其转换为Markdown或CSV格式。',
+        isFullPath: true // 固定为 true
+    },
 ];

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>⚡️ 高性能文档转换器</h1>
+        <p>采用异步任务架构，支持基础版和增强版两种模式。</p>
+
+        <form id="conversion-form">
+            <h3>1. 上传您的文件</h3>
+            <input type="file" id="file-uploader" multiple required accept=".pdf,.docx,.txt,.xlsx,.xls">
+
+            <h3>2. 选择处理引擎</h3>
+            <input type="radio" id="engine-basic" name="engine" value="basic" checked>
+            <label for="engine-basic">基础版 (速度快)</label><br>
+            <input type="radio" id="engine-enhanced" name="engine" value="enhanced">
+            <label for="engine-enhanced">增强版 (AI精度高)</label>
+
+            <h3>3. 选择输出格式</h3>
+            <input type="radio" id="format-md" name="output_format" value="md" checked>
+            <label for="format-md">Markdown (.md)</label><br>
+            <input type="radio" id="format-csv" name="output_format" value="csv">
+            <label for="format-csv">CSV (表格提取)</label>
+
+            <button type="submit">🚀 开始转换</button>
+        </form>
+
+        <div id="status-area" style="display:none;">
+            <h3>处理状态</h3>
+            <progress id="progress-bar" value="0" max="100"></progress>
+            <p id="status-text"></p>
+        </div>
+
+        <div id="download-area" style="display:none;">
+             <h3>4. 下载结果</h3>
+             <a id="download-link" href="#" class="button">📥 下载文件 (ZIP)</a>
+        </div>
+    </div>
+
+    <script src="../../auth.js"></script>
+    <script src="../../models.js"></script>
+    <script src="../../usage.js"></script>
+    <script src="script.js"></script> </body>
+</html>

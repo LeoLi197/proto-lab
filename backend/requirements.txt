@@ -26,3 +26,13 @@ python-multipart==0.0.9  # Required for file uploads
 # Note: pdf2image requires system-level poppler-utils installation
 # Uncomment only if high-quality PDF rendering is required:
 # pdf2image==1.16.3
+
+docling
+docling-core
+pandas
+openpyxl
+dashscope
+python-dotenv
+pdf2image
+Pillow
+
