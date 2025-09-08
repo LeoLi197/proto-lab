@@ -5,7 +5,7 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Optional, List
 from dashscope import MultiModalConversation
-from src import config
+from .. import config
 
 def extract_content_from_multiple_images(
     image_paths: List[Path],

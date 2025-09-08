@@ -11,8 +11,8 @@ from typing import List
 import pandas as pd
 from pdf2image import convert_from_path
 
-from src import config
-from src.services import llm_service
+from .. import config  
+from . import llm_service  
 
 PAGE_CHUNK_SIZE = 25
 
