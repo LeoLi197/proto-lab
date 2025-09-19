@@ -36,4 +36,5 @@ python-dotenv
 pdf2image
 Pillow
 python-chess==1.999
+deepsearch-toolkit
 
