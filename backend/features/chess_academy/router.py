@@ -151,12 +151,12 @@ class FenRequest(BaseModel):
 
 
 class LegalMovesRequest(FenRequest):
-    square: str = Field(..., regex=r"^[a-h][1-8]$", description="Square in algebraic notation")
+    square: str = Field(..., pattern=r"^[a-h][1-8]$", description="Square in algebraic notation")
 
 
 class MoveRequest(FenRequest):
-    move: str = Field(..., regex=r"^[a-h][1-8][a-h][1-8][qrbn]?$")
-    promotion: Optional[str] = Field(None, regex=r"^[qrbn]$")
+    move: str = Field(..., pattern=r"^[a-h][1-8][a-h][1-8][qrbn]?$")
+    promotion: Optional[str] = Field(None, pattern=r"^[qrbn]$")
 
 
 class AIMoveRequest(FenRequest):
