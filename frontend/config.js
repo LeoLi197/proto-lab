@@ -60,6 +60,12 @@ const FEATURES = [
         isFullPath: true
     },
     {
+        path: 'chess-academy/index.html',
+        name: '♟️ 星空儿童国际象棋学院',
+        description: '面向小学生的国际象棋学习和对弈模块，包含智能棋友、友好提示与每日谜题。',
+        isFullPath: true
+    },
+    {
         path: 'doc-converter/index.html', // 路径相对于 frontend/features/
         name: '高性能文档转换器',
         description: '上传PDF, DOCX等多种文档，通过基础或AI增强引擎，将其转换为Markdown或CSV格式。',
