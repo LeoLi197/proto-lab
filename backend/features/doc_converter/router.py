@@ -6,15 +6,10 @@ import shutil
 import uuid
 import zipfile
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
-
-# 假设 docling, pydantic 等核心库已在主项目的 requirements.txt 中定义
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions, TesseractCliOcrOptions
-from docling.document_converter import DocumentConverter, PdfFormatOption
 
 # ==============================================================================
 # 【核心修改】: 导入路径从项目级 (src.) 变更为模块级相对路径 (.)
@@ -38,7 +33,8 @@ router = APIRouter(
 TEMP_INPUT_DIR = Path("temp_input")
 TEMP_OUTPUT_DIR = Path("temp_output")
 task_statuses = {}
-docling_converter = None # 全局变量，延迟初始化
+docling_converter = None  # 全局变量，延迟初始化
+docling_import_error: Optional[Exception] = None
 
 # 确保临时目录在模块加载时就准备好
 # 注意：在多进程或无状态环境中，可能需要更健壮的目录管理策略
@@ -49,30 +45,45 @@ file_utils.ensure_dir_exists(TEMP_OUTPUT_DIR)
 # --- 模块内部辅助函数 ---
 # 以下函数从原 main.py 直接迁移过来，无需修改其内部逻辑
 
-def initialize_docling_converter():
+def initialize_docling_converter() -> None:
     """懒加载方式初始化Docling转换器，仅在需要时执行。"""
-    global docling_converter
-    if docling_converter is None:
-        try:
-            logging.info("正在配置并初始化 Docling 转换器...")
-            pdf_pipeline_options = PdfPipelineOptions(
-                generate_page_images=True, # 增强版需要图片，基础版保留也无妨
-                do_ocr=True,
-                ocr_options=TesseractCliOcrOptions(force_full_page_ocr=True),
-                do_table_structure=True,
-            )
-            pdf_pipeline_options.table_structure_options.do_cell_matching = True
-            docling_converter = DocumentConverter(
-                format_options={
-                    InputFormat.PDF: PdfFormatOption(
-                        pipeline_options=pdf_pipeline_options,
-                    )
-                }
-            )
-            logging.info("Docling 转换器初始化成功。")
-        except Exception as e:
-            logging.error(f"无法初始化 Docling 转换器: {e}")
-            raise e
+
+    global docling_converter, docling_import_error
+
+    if docling_converter is not None:
+        return
+
+    try:
+        from docling.datamodel.base_models import PipelineOptions, TableStructureOptions
+        from docling.document_converter import DocumentConverter
+    except Exception as exc:  # pragma: no cover - 仅在运行时缺少依赖时触发
+        docling_import_error = exc
+        logging.error("无法导入 Docling 相关依赖: %s", exc, exc_info=True)
+        raise
+
+    logging.info("正在配置并初始化 Docling 转换器...")
+
+    pipeline_options = PipelineOptions(
+        do_ocr=True,
+        table_structure_options=TableStructureOptions(do_cell_matching=True),
+    )
+
+    docling_converter = DocumentConverter(pipeline_options=pipeline_options)
+    docling_import_error = None
+    logging.info("Docling 转换器初始化成功。")
+
+
+def ensure_docling_ready() -> None:
+    """确保 Docling 转换器可用，否则向调用方抛出 HTTP 异常。"""
+
+    try:
+        initialize_docling_converter()
+    except Exception as exc:  # pragma: no cover - 运行时异常
+        message = (
+            "Docling 转换功能未正确配置。请确认已安装 `docling` 和"
+            " `deepsearch-toolkit` 依赖，并且镜像具备所需的系统组件。"
+        )
+        raise HTTPException(status_code=503, detail=message) from exc
 
 def process_and_zip_results(task_id: str, input_dir: Path, output_dir: Path, final_zip_name: str):
     """通用后处理函数：处理输出文件并打包成ZIP。"""
@@ -113,7 +124,12 @@ def run_batch_conversion_task(
             raise ValueError("批量任务的输入目录为空。")
 
         if engine == "basic":
-            initialize_docling_converter() # 确保Docling已初始化
+            try:
+                initialize_docling_converter()  # 确保Docling已初始化
+            except Exception as exc:
+                logging.error(f"[{task_id}] Docling 初始化失败: {exc}")
+                task_statuses[task_id] = {"status": "failed", "error": str(exc)}
+                return
             basic_service.convert_batch_documents_basic(
                 source_paths=source_paths,
                 output_dir=output_dir,
@@ -158,6 +174,10 @@ async def submit_batch_conversion_task(
 ):
     if engine not in ["basic", "enhanced"]:
         raise HTTPException(status_code=400, detail="无效的处理引擎。请选择 'basic' 或 'enhanced'。")
+
+    # 在处理文件之前确保 Docling 转换器可用
+    if engine == "basic":
+        ensure_docling_ready()
 
     for file in files:
         file_extension = Path(file.filename).suffix.lower()
