@@ -3,183 +3,73 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>雅思学习系统 - flashmvp</title>
+    <title>雅思情景化学习系统</title>
     <link rel="stylesheet" href="../../style.css">
     <link rel="icon" href="../../public/favicon.ico">
 </head>
 <body>
     <div class="feature-container ielts-container">
-        <header>
+        <header class="page-header">
             <div>
-                <h1>雅思(IELTS)智能学习系统</h1>
-                <p class="intro">面向学生与职场考生的全栈备考方案，覆盖听、说、读、写四项技能，支持个性化学习路径与数据化进度追踪。</p>
+                <h1>IELTS 情景化学习系统</h1>
+                <p class="intro">上传真实单词照片后，系统自动生成场景故事，并同步构建听力、阅读与对话训练，让每一个词汇都在具体语境中被反复使用。</p>
             </div>
             <a class="back-link" href="../../dashboard.html">← 返回功能中心</a>
         </header>
 
         <main>
-            <section class="panel">
-                <h2>01. 个性化学习路径规划</h2>
-                <p>输入当前分数与备考时间，系统会结合目标分数生成阶段性学习路径、重点技能与每日节奏建议。</p>
-                <form id="assessmentForm" class="form-grid">
-                    <div class="form-group">
-                        <label for="targetBand">目标分数</label>
-                        <select id="targetBand" required>
-                            <option value="5.5">5.5</option>
-                            <option value="6.5" selected>6.5</option>
-                            <option value="7.5+">7.5+</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="listeningScore">听力现水平</label>
-                        <input type="number" id="listeningScore" step="0.5" min="0" max="9" value="5.0" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="speakingScore">口语现水平</label>
-                        <input type="number" id="speakingScore" step="0.5" min="0" max="9" value="5.0" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="readingScore">阅读现水平</label>
-                        <input type="number" id="readingScore" step="0.5" min="0" max="9" value="5.5" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="writingScore">写作现水平</label>
-                        <input type="number" id="writingScore" step="0.5" min="0" max="9" value="5.0" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="weeklyHours">每周可投入时长</label>
-                        <input type="number" id="weeklyHours" min="5" max="60" value="15" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="weeksUntilExam">距离考试(周)</label>
-                        <input type="number" id="weeksUntilExam" min="1" max="52" value="12" required>
+            <section id="uploadPanel" class="panel">
+                <h2>上传板块 · 构建学习语料</h2>
+                <p>支持批量上传学习资料照片，可额外输入自定义词汇或情景提示，生成器会输出完整文章与练习方案。</p>
+                <form id="uploadForm" class="form-grid" enctype="multipart/form-data">
+                    <div class="form-group form-group-full">
+                        <label for="wordImages">上传单词照片</label>
+                        <input type="file" id="wordImages" name="files" accept="image/*" multiple>
+                        <small class="form-tip">建议保持照片清晰、光线充足；如识别失败可在下方手动补充。</small>
                     </div>
                     <div class="form-group form-group-full">
-                        <span>偏好强化技能（可多选）</span>
-                        <div class="checkbox-row">
-                            <label><input type="checkbox" value="listening"> 听力</label>
-                            <label><input type="checkbox" value="speaking"> 口语</label>
-                            <label><input type="checkbox" value="reading"> 阅读</label>
-                            <label><input type="checkbox" value="writing"> 写作</label>
-                        </div>
+                        <label for="manualWords">手动补充词汇（可逗号或换行分隔）</label>
+                        <textarea id="manualWords" rows="3" placeholder="education, educator, anthropology..."></textarea>
+                    </div>
+                    <div class="form-group form-group-full">
+                        <label for="scenarioHint">情景提示（选填）</label>
+                        <input type="text" id="scenarioHint" placeholder="例如：校园迎新、研究所参观、职业规划会">
                     </div>
                     <div class="form-actions form-group-full">
-                        <button type="submit" id="planBtn">生成学习计划</button>
+                        <button type="submit" id="uploadBtn">生成学习素材</button>
                     </div>
                 </form>
-                <div id="planOutput" class="result-box" style="display:none;"></div>
+                <div id="uploadSummary" class="result-box" style="display:none;"></div>
             </section>
 
-            <section class="panel">
-                <h2>02. 听说读写模块全景</h2>
-                <p>系统化规划四大模块的训练路径，可根据阶段自由组合，确保强项保持、弱项补齐。</p>
-                <div id="moduleGrid" class="module-grid"></div>
-            </section>
-
-            <section class="panel">
-                <h2>03. 支撑与激励系统</h2>
-                <p>学习进度追踪、错题复习、词汇手册与报告分析模块协同工作，帮助你持续保持动力。</p>
-                <div id="supportingTools" class="supporting-grid"></div>
-            </section>
-
-            <section class="panel">
-                <h2>04. 模拟考试 & 词汇手册</h2>
-                <div class="dual-column">
-                    <div>
-                        <h3>模拟考试中心</h3>
-                        <p>选择适合阶段的模考套题，自动生成评分与弱项分析。</p>
-                        <div id="mockTests" class="mock-list"></div>
-                    </div>
-                    <div>
-                        <h3>词汇手册</h3>
-                        <label for="vocabStage">当前训练阶段</label>
-                        <select id="vocabStage">
-                            <option value="foundation">入门衔接</option>
-                            <option value="core" selected>基础夯实</option>
-                            <option value="advanced">进阶突破</option>
-                            <option value="sprint">冲刺拔高</option>
-                        </select>
-                        <div id="vocabDeck" class="vocab-box"></div>
-                    </div>
+            <section id="listeningPanel" class="panel module-block">
+                <div class="panel-heading">
+                    <h2>听力板块 · 语音理解与拼写</h2>
+                    <span id="listeningStatus" class="status-pill">等待生成</span>
+                </div>
+                <div id="listeningContent" class="module-content">
+                    <p class="placeholder">请先上传资料以生成听力脚本和题目。</p>
                 </div>
             </section>
 
-            <section class="panel">
-                <h2>05. 阶段复盘助手</h2>
-                <p>对比阶段前后的分数变化，智能推荐下一阶段重点与模考节奏。</p>
-                <form id="progressForm" class="form-grid">
-                    <div class="form-group">
-                        <label for="baselineListening">初始听力</label>
-                        <input type="number" id="baselineListening" step="0.5" min="0" max="9" value="5.0" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="baselineSpeaking">初始口语</label>
-                        <input type="number" id="baselineSpeaking" step="0.5" min="0" max="9" value="5.0" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="baselineReading">初始阅读</label>
-                        <input type="number" id="baselineReading" step="0.5" min="0" max="9" value="5.5" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="baselineWriting">初始写作</label>
-                        <input type="number" id="baselineWriting" step="0.5" min="0" max="9" value="5.0" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="latestListening">最新听力</label>
-                        <input type="number" id="latestListening" step="0.5" min="0" max="9" value="6.0" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="latestSpeaking">最新口语</label>
-                        <input type="number" id="latestSpeaking" step="0.5" min="0" max="9" value="5.5" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="latestReading">最新阅读</label>
-                        <input type="number" id="latestReading" step="0.5" min="0" max="9" value="6.0" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="latestWriting">最新写作</label>
-                        <input type="number" id="latestWriting" step="0.5" min="0" max="9" value="5.5" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="weeksElapsed">已学习周数</label>
-                        <input type="number" id="weeksElapsed" min="1" max="52" value="6" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="loggedHours">累计学习时长</label>
-                        <input type="number" id="loggedHours" min="1" max="800" value="120" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="mockCompleted">已完成模考次数</label>
-                        <input type="number" id="mockCompleted" min="0" max="40" value="2" required>
-                    </div>
-                    <div class="form-actions form-group-full">
-                        <button type="submit" id="reviewBtn">生成复盘建议</button>
-                    </div>
-                </form>
-                <div id="progressOutput" class="result-box" style="display:none;"></div>
-            </section>
-
-            <section class="panel">
-                <h2>06. 互动训练实验室</h2>
-                <p>结合真实任务，直接完成听说读写练习并获取即时反馈，可在同一界面完成练习、提交答案与查看分析。</p>
-                <div class="practice-lab">
-                    <div class="practice-tabs" role="tablist">
-                        <button type="button" class="practice-tab active" data-skill="listening">听力训练</button>
-                        <button type="button" class="practice-tab" data-skill="reading">阅读练习</button>
-                        <button type="button" class="practice-tab" data-skill="speaking">口语演练</button>
-                        <button type="button" class="practice-tab" data-skill="writing">写作任务</button>
-                        <button type="button" class="practice-tab" data-skill="vocabulary">词汇测验</button>
-                    </div>
-                    <div id="practiceContent" class="practice-content">
-                        <p class="practice-note">选择上方技能即可开始互动练习。</p>
-                    </div>
+            <section id="readingPanel" class="panel module-block">
+                <div class="panel-heading">
+                    <h2>阅读板块 · 精读与词汇定位</h2>
+                    <span id="readingStatus" class="status-pill">等待生成</span>
+                </div>
+                <div id="readingContent" class="module-content">
+                    <p class="placeholder">上传成功后会展示文章段落、词汇表以及覆盖全部词汇的题目。</p>
                 </div>
             </section>
 
-            <section class="panel">
-                <h2>07. 架构与扩展</h2>
-                <p>语音识别、语音合成与大语言模型服务均通过标准接口接入，可随时替换供应商；平台支持数据隔离与备份恢复。</p>
-                <div id="systemOverview" class="system-overview"></div>
+            <section id="conversationPanel" class="panel module-block">
+                <div class="panel-heading">
+                    <h2>对话板块 · 语音互动</h2>
+                    <span id="conversationStatus" class="status-pill">等待生成</span>
+                </div>
+                <div id="conversationContent" class="module-content">
+                    <p class="placeholder">生成会话脚本后，可用浏览器语音合成朗读问题，配合录音练习口语输出。</p>
+                </div>
             </section>
         </main>
     </div>
@@ -190,578 +80,171 @@
     <script src="../../usage.js"></script>
     <script src="./script.js"></script>
     <style>
-        .ielts-container header {
+        .page-header {
+            display: flex;
             align-items: flex-start;
+            justify-content: space-between;
             gap: 24px;
         }
-        .ielts-container .intro {
-            max-width: 640px;
+        .page-header .intro {
+            max-width: 680px;
             color: #4a4a4a;
         }
-        .back-link {
-            align-self: center;
-            color: #007bff;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        .panel + .panel {
-            margin-top: 30px;
-        }
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px 20px;
-            margin-top: 20px;
-        }
-        .form-group {
+        .module-block .panel-heading {
             display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .form-group-full {
-            grid-column: 1 / -1;
-        }
-        .checkbox-row {
-            display: flex;
-            gap: 18px;
-            flex-wrap: wrap;
-        }
-        .form-actions {
-            display: flex;
-            justify-content: flex-end;
-        }
-        .chip {
-            display: inline-block;
-            background: #e8f3ff;
-            color: #0b61c3;
-            padding: 4px 10px;
-            border-radius: 999px;
-            font-size: 13px;
-            margin-right: 6px;
-        }
-        .plan-meta {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-        .plan-meta div {
-            background: #f5f8ff;
-            padding: 12px 16px;
-            border-radius: 8px;
-        }
-        .meta-title {
-            display: block;
-            font-size: 13px;
-            color: #667085;
-            margin-bottom: 4px;
-        }
-        .phase-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 18px;
-        }
-        .phase-card {
-            border: 1px solid #e3e8f0;
-            border-radius: 10px;
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            background: #fff;
-        }
-        .phase-header {
-            display: flex;
-            justify-content: space-between;
             align-items: center;
-            font-size: 14px;
-            color: #475467;
-        }
-        .phase-summary {
-            color: #4b5563;
-            font-size: 14px;
-        }
-        .phase-section h4 {
-            font-size: 14px;
-            margin-bottom: 6px;
-            color: #1f2937;
-        }
-        .phase-section ul {
-            padding-left: 18px;
-            color: #4a5568;
-            font-size: 14px;
-        }
-        .plan-section + .plan-section {
-            margin-top: 24px;
-        }
-        .daily-template {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 14px;
-        }
-        .daily-block {
-            background: #f8fafc;
-            border-radius: 8px;
-            padding: 12px 14px;
-        }
-        .daily-block h4 {
-            font-size: 13px;
-            color: #0f172a;
-            margin-bottom: 6px;
-        }
-        .daily-block ul {
-            padding-left: 18px;
-            font-size: 13px;
-            color: #475467;
-        }
-        .module-grid,
-        .supporting-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 18px;
-            margin-top: 18px;
-        }
-        .module-card,
-        .support-card {
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            padding: 18px;
-            background: #fff;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        .module-card h3,
-        .support-card h3 {
-            color: #1f2937;
-        }
-        .module-section h4,
-        .support-card ul {
-            font-size: 14px;
-        }
-        .dual-column {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 24px;
-            margin-top: 16px;
-        }
-        .mock-list {
-            display: grid;
-            gap: 16px;
-        }
-        .mock-card {
-            border: 1px solid #dbe3f0;
-            border-radius: 10px;
-            padding: 16px;
-            background: #fff;
-        }
-        .mock-header {
-            display: flex;
             justify-content: space-between;
-            margin-bottom: 8px;
-            color: #344054;
-        }
-        .vocab-box {
-            margin-top: 12px;
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            padding: 16px;
-            background: #fff;
-        }
-        .vocab-meta {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 12px;
+            gap: 16px;
             margin-bottom: 12px;
         }
-        .integration-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 16px;
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            background: #eef2ff;
+            color: #3142c6;
+            border-radius: 999px;
+            font-size: 0.85rem;
         }
-        .integration-card {
-            border: 1px solid #d9e2ef;
-            border-radius: 10px;
-            padding: 16px;
-            background: #fff;
+        .status-pill.ready {
+            background: #d7f5e0;
+            color: #0f8d3a;
         }
-        .integration-card h4 {
-            margin-bottom: 6px;
-        }
-        .integration-boundary {
-            font-size: 13px;
+        .status-pill.waiting {
+            background: #f4f4f5;
             color: #4a4a4a;
         }
-        .security-block {
-            margin-top: 20px;
-            border-radius: 10px;
-            border: 1px solid #e2e8f0;
-            padding: 16px;
-            background: #f8fafc;
+        .status-pill.error {
+            background: #fde2e1;
+            color: #d93025;
         }
-        .security-columns {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-top: 12px;
+        .module-content .placeholder {
+            color: #666;
+            padding: 12px 0;
         }
-        .practice-lab {
-            margin-top: 16px;
-            display: grid;
-            gap: 18px;
-        }
-        .practice-tabs {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .practice-tab {
-            border: 1px solid #d4dbe8;
-            background: #f5f8ff;
-            border-radius: 999px;
-            padding: 8px 18px;
-            font-size: 14px;
-            color: #475467;
-            cursor: pointer;
-            transition: background 0.2s ease;
-        }
-        .practice-tab.active {
-            background: #0b61c3;
-            color: #fff;
-            border-color: #0b61c3;
-        }
-        .practice-content {
-            border: 1px solid #dbe3f0;
-            border-radius: 12px;
-            background: #fff;
-            padding: 20px;
-        }
-        .practice-card {
-            display: grid;
-            gap: 20px;
-        }
-        .practice-note {
-            font-size: 13px;
-            color: #667085;
-        }
-        .transcript-box {
-            background: #f5f8ff;
-            border-radius: 10px;
-            padding: 16px;
-            max-height: 240px;
-            overflow-y: auto;
-        }
-        .transcript-line {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 8px;
-            font-size: 14px;
-            color: #1f2937;
-        }
-        .transcript-speaker {
-            font-weight: 600;
-            color: #0f172a;
-            min-width: 80px;
-        }
-        .question-block {
-            margin-top: 12px;
-            padding: 14px;
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            background: #fdfefe;
-        }
-        .question-block h4 {
-            font-size: 15px;
-            margin-bottom: 10px;
-            color: #111827;
-        }
-        .option-row {
-            display: flex;
+        .session-chip {
+            display: inline-flex;
             align-items: center;
             gap: 8px;
-            margin-bottom: 6px;
-            font-size: 14px;
-            color: #374151;
-        }
-        .practice-actions {
-            display: flex;
-            justify-content: flex-end;
-            margin-top: 12px;
-        }
-        .practice-section {
-            margin-top: 12px;
-        }
-        .practice-section h4 {
-            font-size: 14px;
-            margin-bottom: 6px;
-            color: #1f2937;
-        }
-        .tips-list {
-            padding-left: 18px;
-            font-size: 14px;
-            color: #475467;
-        }
-        .tips-list li + li {
-            margin-top: 4px;
-        }
-        .reading-passage {
-            background: #f8fafc;
-            border-radius: 10px;
-            padding: 16px;
-            display: grid;
-            gap: 12px;
-            font-size: 14px;
-            line-height: 1.6;
-            color: #1f2937;
-        }
-        .result-summary {
-            font-weight: 600;
-            font-size: 15px;
-            color: #0f172a;
-        }
-        .breakdown-list {
-            margin-top: 10px;
-            padding-left: 18px;
-            font-size: 14px;
-            color: #374151;
-        }
-        .breakdown-list li.correct {
-            color: #047857;
-        }
-        .breakdown-list li.incorrect {
-            color: #b91c1c;
-        }
-        .practice-grid {
-            display: grid;
-            gap: 18px;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        }
-        .writing-form {
-            display: grid;
-            gap: 12px;
-        }
-        .writing-form textarea,
-        #speakingTranscript {
-            width: 100%;
-            border-radius: 10px;
-            border: 1px solid #d0d5dd;
-            padding: 12px;
-            font-size: 14px;
-            resize: vertical;
-            min-height: 160px;
-            color: #1f2937;
-        }
-        .timer-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-top: 8px;
-        }
-        .timer-display {
-            font-size: 18px;
-            font-weight: 600;
-            color: #0f172a;
-            min-width: 80px;
-        }
-        .timer-btn {
-            border: 1px solid #bcd4f6;
-            background: #e8f3ff;
-            color: #0b61c3;
-            border-radius: 8px;
             padding: 6px 12px;
-            cursor: pointer;
-            transition: background 0.2s ease;
+            background: #f2f7ff;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            color: #2643a1;
         }
-        .timer-btn:hover {
-            background: #d7e8ff;
+        .word-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 12px 0;
         }
-        .feedback-grid {
-            display: grid;
-            gap: 14px;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        .word-chip {
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #f7fafc;
+            border: 1px solid #d6e4ff;
+            font-size: 0.9rem;
         }
-        .feedback-card {
-            background: #f8fafc;
+        .question-card {
             border: 1px solid #e2e8f0;
             border-radius: 10px;
-            padding: 14px;
-            font-size: 14px;
-            color: #1f2937;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+            background: #fff;
         }
-        .feedback-card h4 {
-            margin-bottom: 8px;
-            font-size: 14px;
-            color: #0f172a;
+        .question-card label {
+            font-weight: 600;
+            display: block;
+            margin-bottom: 6px;
         }
-        .error {
-            color: #c53030;
+        .question-card input {
+            width: 100%;
+            border: 1px solid #cbd5f5;
+            border-radius: 6px;
+            padding: 8px 10px;
         }
-        .listening-card {
-            gap: 16px;
+        .question-card .hint {
+            margin-top: 6px;
+            font-size: 0.85rem;
+            color: #556987;
         }
-        .listening-header h3 {
-            margin-bottom: 4px;
-        }
-        .listening-audio-box {
-            border: 1px solid #dbe3f5;
+        .audio-box {
+            margin: 12px 0;
+            padding: 12px;
             background: #f6f9ff;
             border-radius: 10px;
-            padding: 14px 16px;
+            border: 1px solid #dbe4ff;
+        }
+        .segment-list {
+            margin-top: 12px;
+            display: grid;
+            gap: 8px;
+        }
+        .segment-item {
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: #f9fafb;
+            border: 1px solid #e2e8f0;
+            font-size: 0.9rem;
+        }
+        .glossary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .glossary-card {
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #fff;
+            font-size: 0.9rem;
+        }
+        .conversation-steps {
             display: grid;
             gap: 12px;
+            margin-top: 12px;
         }
-        .audio-box-header {
+        .agenda-card {
+            border: 1px dashed #d3def8;
+            border-radius: 8px;
+            padding: 12px;
+            background: #fbfdff;
+        }
+        .voice-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-        }
-        .audio-box-header h4 {
-            margin: 0;
-            font-size: 15px;
-            color: #0f172a;
-        }
-        .audio-duration {
-            font-size: 12px;
-            color: #475467;
-        }
-        .listening-audio {
-            width: 100%;
-        }
-        .audio-button-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .audio-button-group button {
-            background: #0b61c3;
-            color: #fff;
-            border: none;
+            padding: 10px 12px;
             border-radius: 8px;
-            padding: 8px 16px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: opacity 0.2s ease;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 8px;
         }
-        .audio-button-group button:hover:not(.disabled) {
-            opacity: 0.88;
-        }
-        .audio-button-group button.disabled {
-            background: #d1d5db;
-            color: #6b7280;
-            cursor: not-allowed;
-        }
-        .audio-note {
-            margin: 0;
-        }
-        .key-phrase-section {
-            margin-top: 0;
-        }
-        .key-phrase-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .key-phrase-pill {
-            display: inline-flex;
-            flex-direction: column;
-            gap: 2px;
-            padding: 8px 12px;
-            border-radius: 8px;
-            background: #eef4ff;
-            border: 1px solid #c8d9ff;
-            color: #1f2937;
-            font-size: 13px;
-        }
-        .key-phrase-pill strong {
-            font-weight: 600;
-            color: #0f172a;
-        }
-        .key-phrase-note {
-            font-size: 12px;
-            color: #475467;
-        }
-        .transcript-toggle {
-            display: flex;
-            justify-content: flex-end;
-        }
-        .transcript-toggle button {
-            border: 1px solid #bcd4f6;
-            background: #eef4ff;
-            color: #0b61c3;
-            border-radius: 8px;
+        .voice-row button {
             padding: 6px 12px;
-            font-size: 13px;
-            cursor: pointer;
-        }
-        .transcript-toggle button:hover {
-            background: #dce8ff;
-        }
-        .transcript-box.collapsed {
-            display: none;
-        }
-        .ai-coach-block {
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px dashed #d4dbe8;
-        }
-        .ai-coach-btn {
-            background: #1f4bd8;
+            border-radius: 6px;
+            background: #3142c6;
             color: #fff;
             border: none;
-            border-radius: 8px;
-            padding: 8px 18px;
             cursor: pointer;
-            font-size: 14px;
-            transition: background 0.2s ease;
         }
-        .ai-coach-btn:hover {
-            background: #163bb0;
-        }
-        .ai-coach-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        .ai-coach-output {
-            margin-top: 12px;
-            background: #f6f8ff;
-            border: 1px solid #d6dcff;
+        .evaluation-box {
+            margin-top: 16px;
+            padding: 12px;
             border-radius: 10px;
-            padding: 14px 16px;
-            font-size: 14px;
-            color: #1f2937;
-            line-height: 1.65;
+            background: #f5f7ff;
+            border: 1px solid #d6e4ff;
         }
-        .ai-coach-output h3,
-        .ai-coach-output h4,
-        .ai-coach-output h5 {
-            margin-top: 10px;
-            margin-bottom: 6px;
-            font-size: 15px;
-            color: #0f172a;
-        }
-        .ai-coach-output ul,
-        .ai-coach-output ol {
+        .evaluation-box ul {
+            margin: 8px 0 0;
             padding-left: 20px;
-            margin: 8px 0;
         }
-        .ai-coach-output code {
-            background: #e6ecff;
-            padding: 2px 4px;
-            border-radius: 4px;
-            font-size: 13px;
+        .evaluation-box li.correct {
+            color: #0f8d3a;
         }
-        .ai-coach-output p {
-            margin: 6px 0;
-        }
-        @media (max-width: 720px) {
-            .ielts-container header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            .form-actions {
-                justify-content: flex-start;
-            }
+        .evaluation-box li.incorrect {
+            color: #d93025;
         }
     </style>
 </body>
