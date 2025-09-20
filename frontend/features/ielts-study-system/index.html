@@ -160,7 +160,24 @@
             </section>
 
             <section class="panel">
-                <h2>06. 架构与扩展</h2>
+                <h2>06. 互动训练实验室</h2>
+                <p>结合真实任务，直接完成听说读写练习并获取即时反馈，可在同一界面完成练习、提交答案与查看分析。</p>
+                <div class="practice-lab">
+                    <div class="practice-tabs" role="tablist">
+                        <button type="button" class="practice-tab active" data-skill="listening">听力训练</button>
+                        <button type="button" class="practice-tab" data-skill="reading">阅读练习</button>
+                        <button type="button" class="practice-tab" data-skill="speaking">口语演练</button>
+                        <button type="button" class="practice-tab" data-skill="writing">写作任务</button>
+                        <button type="button" class="practice-tab" data-skill="vocabulary">词汇测验</button>
+                    </div>
+                    <div id="practiceContent" class="practice-content">
+                        <p class="practice-note">选择上方技能即可开始互动练习。</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>07. 架构与扩展</h2>
                 <p>语音识别、语音合成与大语言模型服务均通过标准接口接入，可随时替换供应商；平台支持数据隔离与备份恢复。</p>
                 <div id="systemOverview" class="system-overview"></div>
             </section>
@@ -387,6 +404,194 @@
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 16px;
             margin-top: 12px;
+        }
+        .practice-lab {
+            margin-top: 16px;
+            display: grid;
+            gap: 18px;
+        }
+        .practice-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .practice-tab {
+            border: 1px solid #d4dbe8;
+            background: #f5f8ff;
+            border-radius: 999px;
+            padding: 8px 18px;
+            font-size: 14px;
+            color: #475467;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        .practice-tab.active {
+            background: #0b61c3;
+            color: #fff;
+            border-color: #0b61c3;
+        }
+        .practice-content {
+            border: 1px solid #dbe3f0;
+            border-radius: 12px;
+            background: #fff;
+            padding: 20px;
+        }
+        .practice-card {
+            display: grid;
+            gap: 20px;
+        }
+        .practice-note {
+            font-size: 13px;
+            color: #667085;
+        }
+        .transcript-box {
+            background: #f5f8ff;
+            border-radius: 10px;
+            padding: 16px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+        .transcript-line {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #1f2937;
+        }
+        .transcript-speaker {
+            font-weight: 600;
+            color: #0f172a;
+            min-width: 80px;
+        }
+        .question-block {
+            margin-top: 12px;
+            padding: 14px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            background: #fdfefe;
+        }
+        .question-block h4 {
+            font-size: 15px;
+            margin-bottom: 10px;
+            color: #111827;
+        }
+        .option-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #374151;
+        }
+        .practice-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 12px;
+        }
+        .practice-section {
+            margin-top: 12px;
+        }
+        .practice-section h4 {
+            font-size: 14px;
+            margin-bottom: 6px;
+            color: #1f2937;
+        }
+        .tips-list {
+            padding-left: 18px;
+            font-size: 14px;
+            color: #475467;
+        }
+        .tips-list li + li {
+            margin-top: 4px;
+        }
+        .reading-passage {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 16px;
+            display: grid;
+            gap: 12px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #1f2937;
+        }
+        .result-summary {
+            font-weight: 600;
+            font-size: 15px;
+            color: #0f172a;
+        }
+        .breakdown-list {
+            margin-top: 10px;
+            padding-left: 18px;
+            font-size: 14px;
+            color: #374151;
+        }
+        .breakdown-list li.correct {
+            color: #047857;
+        }
+        .breakdown-list li.incorrect {
+            color: #b91c1c;
+        }
+        .practice-grid {
+            display: grid;
+            gap: 18px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        }
+        .writing-form {
+            display: grid;
+            gap: 12px;
+        }
+        .writing-form textarea,
+        #speakingTranscript {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid #d0d5dd;
+            padding: 12px;
+            font-size: 14px;
+            resize: vertical;
+            min-height: 160px;
+            color: #1f2937;
+        }
+        .timer-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .timer-display {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0f172a;
+            min-width: 80px;
+        }
+        .timer-btn {
+            border: 1px solid #bcd4f6;
+            background: #e8f3ff;
+            color: #0b61c3;
+            border-radius: 8px;
+            padding: 6px 12px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        .timer-btn:hover {
+            background: #d7e8ff;
+        }
+        .feedback-grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+        .feedback-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px;
+            font-size: 14px;
+            color: #1f2937;
+        }
+        .feedback-card h4 {
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #0f172a;
         }
         .error {
             color: #c53030;
