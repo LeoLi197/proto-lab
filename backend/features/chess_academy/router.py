@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import chess
 from fastapi import APIRouter, HTTPException
@@ -187,13 +187,16 @@ class MoveInfo(BaseModel):
     is_safe: bool = True
 
 
+StatusPayload = Dict[str, Optional[Union[str, bool]]]
+
+
 class MoveOutcome(BaseModel):
     fen: str
     turn: str
     move: MoveInfo
     halfmove_clock: int
     fullmove_number: int
-    status: Dict[str, Optional[str]]
+    status: StatusPayload
     evaluation: Optional[float] = None
     message: Optional[str] = None
 
@@ -214,7 +217,7 @@ class AIMoveResponse(BaseModel):
     fen: str
     evaluation: float
     coach_message: str
-    status: Dict[str, Optional[str]]
+    status: StatusPayload
 
 
 class HintResponse(BaseModel):
@@ -222,7 +225,7 @@ class HintResponse(BaseModel):
     hint: MoveInfo
     evaluation: float
     suggestion: str
-    status: Dict[str, Optional[str]]
+    status: StatusPayload
 
 
 PRACTICE_PUZZLES: List[PracticePuzzle] = [
@@ -423,7 +426,7 @@ def _serialize_move(board: chess.Board, move: chess.Move) -> MoveInfo:
     )
 
 
-def _status_payload(board: chess.Board) -> Dict[str, Optional[str]]:
+def _status_payload(board: chess.Board) -> StatusPayload:
     outcome = board.outcome()
     status = {
         "is_check": board.is_check(),
