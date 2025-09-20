@@ -504,6 +504,14 @@ LISTENING_PRACTICE = {
     "title": "公共交通咨询",
     "description": "模拟雅思听力 Section 1：新生向公交中心咨询最划算的票种与班车时间。",
     "context": "建议先浏览题目关键词，再带着问题听/读对话。",
+    "audio_summary": "Student 和交通服务人员讨论月票、首班车时间以及机场班车预订要求的对话。",
+    "audio_duration_seconds": 85,
+    "key_phrases": [
+        {"phrase": "student monthly pass", "note": "学生月票，工作日与周末均可无限次乘坐"},
+        {"phrase": "first bus at 6:15 a.m.", "note": "工作日首班车时间"},
+        {"phrase": "shuttle every Saturday 8 a.m.", "note": "机场班车发车频率"},
+        {"phrase": "book at least two days in advance", "note": "预约班车需要提前两天"},
+    ],
     "audio_script": [
         {
             "speaker": "Student",
