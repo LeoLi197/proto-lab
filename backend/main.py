@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # --- 静态导入所有功能模块的路由 ---
 from features.core_api.router import router as core_api_router
 from features.chess_academy.router import router as chess_academy_router
+from features.ielts_study_system.router import router as ielts_study_router
 # ==============================================================================
 # [示例] 如何添加新的功能模块
 # ------------------------------------------------------------------------------
@@ -54,6 +55,8 @@ app.include_router(core_api_router, prefix="/api")
 print("✅ Successfully loaded feature: core_api")
 app.include_router(chess_academy_router, prefix="/api")
 print("✅ Successfully loaded feature: chess_academy")
+app.include_router(ielts_study_router, prefix="/api")
+print("✅ Successfully loaded feature: ielts_study_system")
 
 # ==============================================================================
 # [示例] 如何注册新的功能模块路由
