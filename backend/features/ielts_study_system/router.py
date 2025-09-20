@@ -7,6 +7,9 @@ without impacting other backend modules.
 """
 from __future__ import annotations
 
+from collections import Counter
+from copy import deepcopy
+import re
 from typing import Dict, List, Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -496,6 +499,369 @@ AI_INTEGRATIONS = {
 }
 
 
+LISTENING_PRACTICE = {
+    "id": "listening-transport",
+    "title": "公共交通咨询",
+    "description": "模拟雅思听力 Section 1：新生向公交中心咨询最划算的票种与班车时间。",
+    "context": "建议先浏览题目关键词，再带着问题听/读对话。",
+    "audio_script": [
+        {
+            "speaker": "Student",
+            "text": "Hello, I'm new to the city and I need some advice about the bus passes.",
+        },
+        {"speaker": "Agent", "text": "Of course. Are you staying here long term?"},
+        {
+            "speaker": "Student",
+            "text": "I'll be studying at the college for the next three months.",
+        },
+        {
+            "speaker": "Agent",
+            "text": "Then the student monthly pass would be the best value. It gives unlimited travel on weekdays and weekends.",
+        },
+        {
+            "speaker": "Student",
+            "text": "That sounds good. What time do the first buses leave campus in the morning?",
+        },
+        {
+            "speaker": "Agent",
+            "text": "The earliest bus on weekdays is at 6:15 a.m., and on Sundays it starts at 7:30 a.m.",
+        },
+        {
+            "speaker": "Student",
+            "text": "I also heard there is a shuttle to the airport.",
+        },
+        {
+            "speaker": "Agent",
+            "text": "Yes, it runs every Saturday at 8 a.m. You need to book at least two days in advance.",
+        },
+    ],
+    "questions": [
+        {
+            "id": "l1",
+            "type": "multiple-choice",
+            "question": "学生最终选择的票种是什么？",
+            "options": [
+                {"key": "A", "text": "一周通票"},
+                {"key": "B", "text": "月度学生票"},
+                {"key": "C", "text": "单次票"},
+            ],
+            "answer": "B",
+            "explanation": "对话中工作人员建议购买月度学生票，并说明其最划算。",
+        },
+        {
+            "id": "l2",
+            "type": "multiple-choice",
+            "question": "工作日校园首班车的出发时间是？",
+            "options": [
+                {"key": "A", "text": "6:15 a.m."},
+                {"key": "B", "text": "6:45 a.m."},
+                {"key": "C", "text": "7:30 a.m."},
+            ],
+            "answer": "A",
+            "explanation": "工作人员明确提到工作日首班车在 6:15 出发。",
+        },
+        {
+            "id": "l3",
+            "type": "multiple-choice",
+            "question": "机场班车的运行频率是？",
+            "options": [
+                {"key": "A", "text": "每天上午"},
+                {"key": "B", "text": "每周六上午"},
+                {"key": "C", "text": "仅在考试周"},
+            ],
+            "answer": "B",
+            "explanation": "工作人员提到班车在每周六早上 8 点运行。",
+        },
+        {
+            "id": "l4",
+            "type": "multiple-choice",
+            "question": "机场班车需要提前多久预约？",
+            "options": [
+                {"key": "A", "text": "至少提前 1 天"},
+                {"key": "B", "text": "至少提前 2 天"},
+                {"key": "C", "text": "至少提前 5 天"},
+            ],
+            "answer": "B",
+            "explanation": "对话最后指出需提前两天预订班车座位。",
+        },
+    ],
+    "tips": [
+        "先读题目定位关键词（票种、时间、频率），听时重点捕捉对应信息。",
+        "注意数字表达的差异（six fifteen 与 six fifty）。",
+        "做完后可跟读对话，模仿节奏与语调。",
+    ],
+    "next_steps": [
+        "重新听一遍并尝试记笔记，检验是否能快速提取关键信息。",
+        "用自己的话复述对话内容，训练口语复述能力。",
+    ],
+}
+
+
+READING_PRACTICE = {
+    "id": "reading-coworking",
+    "title": "共享办公空间的发展",
+    "description": "模拟雅思阅读 Section 2，文章探讨共享办公模式兴起的原因与未来趋势。",
+    "passage": [
+        "Paragraph A: Co-working spaces have grown rapidly over the last decade as start-ups sought flexible lease agreements. Instead of committing to long-term contracts, entrepreneurs could rent a desk for a month and scale up or down whenever necessary.",
+        "Paragraph B: Beyond cost savings, companies value the community element. Managers note that informal events in these spaces encourage cross-team collaboration and provide access to professional workshops that would otherwise be unaffordable.",
+        "Paragraph C: Analysts predict that hybrid working will keep the demand steady. However, operators must adapt by offering quieter zones, advanced video-conferencing facilities and membership models tailored to corporate teams rather than only freelancers.",
+    ],
+    "questions": [
+        {
+            "id": "r1",
+            "type": "multiple-choice",
+            "question": "Paragraph A 表明共享办公空间快速增长的主要原因是什么？",
+            "options": [
+                {"key": "A", "text": "租赁合同灵活，方便扩张或缩减"},
+                {"key": "B", "text": "设备比传统办公室更先进"},
+                {"key": "C", "text": "政府给予税收减免"},
+            ],
+            "answer": "A",
+            "explanation": "段落强调初创企业能灵活租用工位，随业务规模调整。",
+        },
+        {
+            "id": "r2",
+            "type": "multiple-choice",
+            "question": "Paragraph B 提到企业看重共享办公空间的什么优势？",
+            "options": [
+                {"key": "A", "text": "空间装修更具现代感"},
+                {"key": "B", "text": "社区活动促进团队合作"},
+                {"key": "C", "text": "租金更低"},
+            ],
+            "answer": "B",
+            "explanation": "该段突出社区活动带来的协作机会和专业工作坊。",
+        },
+        {
+            "id": "r3",
+            "type": "multiple-choice",
+            "question": "Paragraph C 预测运营者未来需要做什么？",
+            "options": [
+                {"key": "A", "text": "停止服务企业客户"},
+                {"key": "B", "text": "增加安静区域和远程会议设施"},
+                {"key": "C", "text": "仅服务自由职业者"},
+            ],
+            "answer": "B",
+            "explanation": "分析师认为需提供安静区、视频会议设备以及企业会员方案。",
+        },
+    ],
+    "tips": [
+        "先浏览题干关键词，定位到对应段落，再精读相关句子。",
+        "注意题干与原文的同义替换（例如 flexible lease 与租赁合同灵活）。",
+        "答题后总结段落主旨，训练摘要能力。",
+    ],
+    "next_steps": [
+        "尝试用一句话概括每个段落的核心观点。",
+        "记录出现的学术词汇并造句，加强写作与口语输出。",
+    ],
+}
+
+
+VOCABULARY_PRACTICE = {
+    "id": "vocabulary-growth",
+    "title": "词汇精准辨析",
+    "description": "围绕雅思常见的学术词汇，练习辨别最贴切的释义或近义替换。",
+    "questions": [
+        {
+            "id": "v1",
+            "type": "multiple-choice",
+            "question": "单词 “allocate” 最接近的含义是？",
+            "options": [
+                {"key": "A", "text": "储存"},
+                {"key": "B", "text": "分配"},
+                {"key": "C", "text": "忽视"},
+            ],
+            "answer": "B",
+            "explanation": "allocate 指按照计划分配资源。",
+        },
+        {
+            "id": "v2",
+            "type": "multiple-choice",
+            "question": "“mitigate” 的含义是？",
+            "options": [
+                {"key": "A", "text": "使……恶化"},
+                {"key": "B", "text": "使……缓和"},
+                {"key": "C", "text": "详细阐述"},
+            ],
+            "answer": "B",
+            "explanation": "mitigate 表示减轻或缓和不利影响。",
+        },
+        {
+            "id": "v3",
+            "type": "multiple-choice",
+            "question": "选择与 “robust” 含义最接近的一项。",
+            "options": [
+                {"key": "A", "text": "脆弱的"},
+                {"key": "B", "text": "强健的"},
+                {"key": "C", "text": "孤立的"},
+            ],
+            "answer": "B",
+            "explanation": "robust 描述体系或论点扎实、强健。",
+        },
+        {
+            "id": "v4",
+            "type": "multiple-choice",
+            "question": "在写作中，用哪个词可替换 “important”？",
+            "options": [
+                {"key": "A", "text": "negligible"},
+                {"key": "B", "text": "significant"},
+                {"key": "C", "text": "trivial"},
+            ],
+            "answer": "B",
+            "explanation": "significant 在学术语境中表示重要、显著。",
+        },
+    ],
+    "tips": [
+        "回忆单词在真题中的语境，判断搭配是否自然。",
+        "尝试用选出的词造句，巩固搭配记忆。",
+    ],
+    "next_steps": [
+        "将易混淆词汇整理到词汇手册并标注例句。",
+        "用这些词写一个 100 词的短段落，练习灵活运用。",
+    ],
+}
+
+
+SPEAKING_PRACTICE = {
+    "id": "speaking-weekend",
+    "title": "口语主题：团队协作与周末活动",
+    "part1": {
+        "description": "热身问题，关注生活习惯与团队协作经历。",
+        "questions": [
+            "你通常周末会做些什么来放松自己？",
+            "你喜欢独自完成任务还是与他人合作？",
+            "你是否参加过社区组织的活动？那是什么？",
+        ],
+        "sample_sentence_starters": [
+            "I usually spend my weekends...",
+            "Working with others helps me...",
+            "One community activity I joined was...",
+        ],
+    },
+    "part2": {
+        "task": "描述一次你参与的小组项目或活动，并说明它为何让你印象深刻。",
+        "prep_seconds": 60,
+        "speaking_seconds": 120,
+        "bullet_points": [
+            "项目或活动的背景",
+            "你在团队中的角色",
+            "遇到的挑战以及如何解决",
+            "你从中学到的经验",
+        ],
+        "language_tips": [
+            "使用 firstly, moreover, as a result 等衔接词维持逻辑。",
+            "描述感受时结合形容词（rewarding, demanding, eye-opening）。",
+        ],
+        "model_outline": [
+            "开场点题并介绍背景",
+            "分两到三个要点描述任务",
+            "总结团队收获或个人反思",
+        ],
+    },
+    "part3": {
+        "description": "深入讨论团队协作在社会中的影响。",
+        "questions": [
+            "为什么越来越多的公司强调跨部门合作？",
+            "在线协作工具会如何改变未来的团队合作方式？",
+            "政府是否应该资助社区团队项目？为什么？",
+        ],
+        "idea_bank": [
+            "跨部门合作可以整合资源并激发创新。",
+            "数字工具降低沟通成本，但需要培训确保有效使用。",
+            "公共资金可提升社区凝聚力，但需透明管理。",
+        ],
+    },
+    "follow_up_prompts": [
+        "尝试录下自己的回答，回放并记录停顿和重复的词。",
+        "将 Part 2 的回答整理成提纲，再转化为写作段落。",
+    ],
+}
+
+
+WRITING_PRACTICE = {
+    "id": "writing-remote-work",
+    "task_type": "Task 2",
+    "question": "More people are choosing to work remotely. Do the advantages of working from home outweigh the disadvantages?",
+    "background": "题目要求讨论远程办公的利弊，可采用正反对比或权衡结构。",
+    "brainstorm_points": [
+        "优势：节省通勤时间、提升工作自主性、企业节约办公成本。",
+        "劣势：社交隔离、沟通效率下降、家庭环境可能造成干扰。",
+        "可以结合实例说明远程办公对不同行业员工的影响。",
+    ],
+    "structure": [
+        "引言：改写题目并给出总体立场。",
+        "主体段 1：优势论证，使用数据或案例支持。",
+        "主体段 2：劣势论证，提出缓解策略。",
+        "结论：重申观点，可提出平衡建议。",
+    ],
+    "checklist": [
+        "字数不少于 250 词。",
+        "每段都有清晰主题句。",
+        "使用至少 3 个高级衔接词。",
+        "提供例证或数据支撑论点。",
+    ],
+    "useful_phrases": [
+        "One compelling advantage is that...",
+        "This can be mitigated by...",
+        "From a broader perspective...",
+    ],
+    "tips": [
+        "写作前用 5 分钟列提纲，确保论点均衡。",
+        "写完后按照 checklist 自查，再进行润色。",
+    ],
+}
+
+
+INTERACTIVE_PRACTICE = {
+    "listening": LISTENING_PRACTICE,
+    "reading": READING_PRACTICE,
+    "vocabulary": VOCABULARY_PRACTICE,
+    "speaking": SPEAKING_PRACTICE,
+    "writing": WRITING_PRACTICE,
+}
+
+
+CONNECTOR_WORDS = {
+    "however",
+    "therefore",
+    "moreover",
+    "furthermore",
+    "nevertheless",
+    "consequently",
+    "meanwhile",
+    "additionally",
+    "in addition",
+    "as a result",
+    "on the other hand",
+    "for example",
+    "for instance",
+    "in contrast",
+    "overall",
+}
+
+
+ACADEMIC_VOCABULARY = {
+    "significant",
+    "sustainable",
+    "contribute",
+    "mitigate",
+    "allocate",
+    "enhance",
+    "infrastructure",
+    "productivity",
+    "flexibility",
+    "collaboration",
+    "consequence",
+    "innovation",
+    "efficiency",
+    "robust",
+    "facilitate",
+}
+
+
+FILLER_WORDS = {"um", "uh", "erm", "er", "like"}
+FILLER_PHRASES = {"you know", "sort of", "kind of"}
+
+
 class SkillScores(BaseModel):
     """User skill scores in IELTS scale."""
 
@@ -523,6 +889,24 @@ class ProgressReviewRequest(BaseModel):
     weeks_elapsed: conint(ge=1, le=52)
     total_logged_hours: conint(ge=1, le=800)
     completed_mock_tests: Optional[conint(ge=0, le=40)] = 0
+
+
+class MultipleChoiceAnswer(BaseModel):
+    question_id: str
+    answer: str = Field(..., min_length=1)
+
+
+class MultipleChoiceSubmission(BaseModel):
+    answers: List[MultipleChoiceAnswer]
+
+
+class WritingFeedbackRequest(BaseModel):
+    response: str = Field(..., min_length=20, description="Learner's writing response")
+
+
+class SpeakingFeedbackRequest(BaseModel):
+    transcript: str = Field(..., min_length=20, description="Learner's speaking transcript or笔记")
+    focus_part: Optional[Literal["part1", "part2", "part3"]] = "part2"
 
 
 def _average_score(scores: SkillScores) -> float:
@@ -646,6 +1030,238 @@ def _weakest_skill(scores: SkillScores) -> SkillName:
     return min(values, key=values.get)  # type: ignore[return-value]
 
 
+def _strip_answers(practice: Dict[str, object]) -> Dict[str, object]:
+    sanitized = deepcopy(practice)
+    questions = sanitized.get("questions")
+    if isinstance(questions, list):
+        sanitized["questions"] = [
+            {key: value for key, value in question.items() if key != "answer"}
+            for question in questions
+        ]
+    return sanitized
+
+
+def _get_practice_or_404(skill: str) -> Dict[str, object]:
+    practice = INTERACTIVE_PRACTICE.get(skill)
+    if not practice:
+        raise HTTPException(status_code=404, detail="未找到对应的练习任务")
+    return practice
+
+
+def _evaluate_multiple_choice_practice(
+    skill: str, submission: MultipleChoiceSubmission
+) -> Dict[str, object]:
+    practice = _get_practice_or_404(skill)
+    questions = practice.get("questions", [])
+    if not questions:
+        raise HTTPException(status_code=400, detail="该练习暂不支持自动批改")
+
+    answer_map = {
+        answer.question_id: answer.answer.strip().upper()
+        for answer in submission.answers
+    }
+    missing = [q["id"] for q in questions if q["id"] not in answer_map]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"缺少题目答案：{', '.join(missing)}",
+        )
+
+    breakdown = []
+    score = 0
+    for question in questions:
+        user_answer = answer_map.get(question["id"], "")
+        correct_answer = question.get("answer", "")
+        is_correct = user_answer == correct_answer
+        if is_correct:
+            score += 1
+        breakdown.append(
+            {
+                "question_id": question["id"],
+                "question": question["question"],
+                "user_answer": user_answer or None,
+                "correct_answer": correct_answer,
+                "correct": is_correct,
+                "explanation": question.get("explanation", ""),
+            }
+        )
+
+    total = len(questions)
+    percentage = round(score / total * 100, 1) if total else 0.0
+    return {
+        "skill": skill,
+        "title": practice.get("title"),
+        "description": practice.get("description"),
+        "score": score,
+        "total": total,
+        "percentage": percentage,
+        "breakdown": breakdown,
+        "tips": practice.get("tips", []),
+        "next_steps": practice.get("next_steps", []),
+    }
+
+
+def _tokenise_text(text: str) -> List[str]:
+    return re.findall(r"[A-Za-z']+", text.lower())
+
+
+def _detect_connectors(text: str) -> List[str]:
+    lowered = text.lower()
+    found = {phrase for phrase in CONNECTOR_WORDS if phrase in lowered}
+    return sorted(found)
+
+
+def _count_academic_words(tokens: List[str]) -> List[str]:
+    return sorted({token for token in tokens if token in ACADEMIC_VOCABULARY})
+
+
+def _count_filler_usage(tokens: List[str], raw_text: str) -> Counter:
+    counts = Counter(token for token in tokens if token in FILLER_WORDS)
+    lowered = raw_text.lower()
+    for phrase in FILLER_PHRASES:
+        occurrences = lowered.count(phrase)
+        if occurrences:
+            counts[phrase] += occurrences
+    return counts
+
+
+def _analyse_writing_response(payload: WritingFeedbackRequest) -> Dict[str, object]:
+    text = payload.response.strip()
+    tokens = _tokenise_text(text)
+    if len(tokens) < 40:
+        raise HTTPException(status_code=400, detail="请至少输入 40 个英文单词，便于生成有效反馈")
+
+    word_count = len(tokens)
+    unique_words = len(set(tokens))
+    lexical_density = round(unique_words / word_count, 2) if word_count else 0.0
+    sentences = [s.strip() for s in re.split(r"[.!?]+", text) if s.strip()]
+    sentence_count = len(sentences) if sentences else 1
+    average_sentence_length = round(word_count / sentence_count, 1)
+    connectors = _detect_connectors(text)
+    academic_words = _count_academic_words(tokens)
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+
+    strengths: List[str] = []
+    improvements: List[str] = []
+
+    if word_count >= 260:
+        strengths.append("字数达标，论点展开充分。")
+    else:
+        improvements.append("字数略少，建议扩展论证确保达到 260 词以上。")
+
+    if connectors:
+        strengths.append(f"使用了衔接词：{', '.join(connectors)}。")
+    else:
+        improvements.append("可增加 moreover, consequently 等衔接词增强逻辑。")
+
+    if lexical_density >= 0.55:
+        strengths.append("词汇多样性良好。")
+    else:
+        improvements.append("词汇重复率较高，尝试使用同义替换提升表达。")
+
+    if average_sentence_length < 12:
+        improvements.append("句子偏短，可尝试使用从句或连接词增加复杂度。")
+    elif average_sentence_length > 28:
+        improvements.append("部分句子偏长，注意断句以提升可读性。")
+    else:
+        strengths.append("句子长度控制合理。")
+
+    if len(paragraphs) >= 4:
+        strengths.append("段落结构完整，符合 Task 2 写作要求。")
+    else:
+        improvements.append("建议将文章划分为至少四段，突出论点层次。")
+
+    band_projection = "5.5-6.0"
+    if word_count >= 260 and lexical_density >= 0.5 and len(connectors) >= 2:
+        band_projection = "6.0-6.5"
+    if word_count >= 280 and lexical_density >= 0.58 and len(connectors) >= 4:
+        band_projection = "6.5-7.0"
+    if word_count >= 300 and lexical_density >= 0.62 and len(connectors) >= 5:
+        band_projection = "7.0+"
+
+    return {
+        "skill": "writing",
+        "word_count": word_count,
+        "unique_words": unique_words,
+        "sentence_count": sentence_count,
+        "average_sentence_length": average_sentence_length,
+        "lexical_density": lexical_density,
+        "connectors": connectors,
+        "academic_vocabulary": academic_words,
+        "paragraphs": len(paragraphs),
+        "strengths": strengths,
+        "improvements": improvements,
+        "band_projection": band_projection,
+        "checklist": WRITING_PRACTICE.get("checklist", []),
+    }
+
+
+def _analyse_speaking_transcript(payload: SpeakingFeedbackRequest) -> Dict[str, object]:
+    text = payload.transcript.strip()
+    tokens = _tokenise_text(text)
+    if len(tokens) < 30:
+        raise HTTPException(status_code=400, detail="请至少整理约 30 个英文单词的回答记录，以便生成反馈")
+
+    word_count = len(tokens)
+    unique_words = len(set(tokens))
+    lexical_variety = round(unique_words / word_count, 2) if word_count else 0.0
+    connectors = _detect_connectors(text)
+    filler_counter = _count_filler_usage(tokens, text)
+    filler_total = sum(filler_counter.values())
+
+    strengths: List[str] = []
+    improvements: List[str] = []
+
+    if connectors:
+        strengths.append(f"能够使用衔接词（{', '.join(connectors)}）组织答案。")
+    else:
+        improvements.append("尝试加入 however, in addition 等衔接词增强逻辑。")
+
+    if lexical_variety >= 0.55:
+        strengths.append("词汇覆盖面较广，表达自然。")
+    else:
+        improvements.append("词汇重复率较高，可准备主题词替换表达。")
+
+    if filler_total:
+        sample_terms = ", ".join(term for term, _ in filler_counter.most_common(3))
+        improvements.append(
+            f"检测到 {filler_total} 个口头语（例如 {sample_terms}），建议用停顿或连接词替代。"
+        )
+    else:
+        strengths.append("几乎没有口头语，语流控制良好。")
+
+    if word_count < 110:
+        improvements.append("输出时长略短，建议补充细节使回答接近 2 分钟。")
+
+    band_projection = "5.5-6.0"
+    if word_count >= 100 and lexical_variety >= 0.52 and filler_total <= max(2, int(word_count * 0.05)):
+        band_projection = "6.0-6.5"
+    if word_count >= 120 and lexical_variety >= 0.58 and filler_total <= max(2, int(word_count * 0.04)) and len(connectors) >= 3:
+        band_projection = "6.5-7.0"
+    if word_count >= 150 and lexical_variety >= 0.62 and filler_total <= 2 and len(connectors) >= 4:
+        band_projection = "7.0+"
+
+    filler_usage = [
+        {"term": term, "count": count}
+        for term, count in filler_counter.items()
+        if count > 0
+    ]
+
+    return {
+        "skill": "speaking",
+        "word_count": word_count,
+        "unique_words": unique_words,
+        "lexical_variety": lexical_variety,
+        "connectors": connectors,
+        "filler_usage": filler_usage,
+        "band_projection": band_projection,
+        "strengths": strengths,
+        "improvements": improvements,
+        "follow_up_prompts": SPEAKING_PRACTICE.get("follow_up_prompts", []),
+        "focus_part": payload.focus_part,
+    }
+
+
 @router.get("/modules")
 def get_skill_modules() -> Dict[str, Dict[str, object]]:
     """Return descriptions of the four IELTS skill modules."""
@@ -688,6 +1304,38 @@ def get_system_overview() -> Dict[str, object]:
             ],
         },
     }
+
+
+@router.get("/interactive/practice")
+def get_interactive_practice() -> Dict[str, object]:
+    """Return interactive practice packs without answer keys."""
+
+    return {skill: _strip_answers(practice) for skill, practice in INTERACTIVE_PRACTICE.items()}
+
+
+@router.post("/interactive/listening/evaluate")
+def evaluate_listening(submission: MultipleChoiceSubmission) -> Dict[str, object]:
+    return _evaluate_multiple_choice_practice("listening", submission)
+
+
+@router.post("/interactive/reading/evaluate")
+def evaluate_reading(submission: MultipleChoiceSubmission) -> Dict[str, object]:
+    return _evaluate_multiple_choice_practice("reading", submission)
+
+
+@router.post("/interactive/vocabulary/evaluate")
+def evaluate_vocabulary(submission: MultipleChoiceSubmission) -> Dict[str, object]:
+    return _evaluate_multiple_choice_practice("vocabulary", submission)
+
+
+@router.post("/interactive/writing/feedback")
+def generate_writing_feedback(payload: WritingFeedbackRequest) -> Dict[str, object]:
+    return _analyse_writing_response(payload)
+
+
+@router.post("/interactive/speaking/coach")
+def generate_speaking_feedback(payload: SpeakingFeedbackRequest) -> Dict[str, object]:
+    return _analyse_speaking_transcript(payload)
 
 
 @router.post("/assessment")
