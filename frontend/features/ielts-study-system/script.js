@@ -13,6 +13,14 @@ const skillLabels = {
 let practiceData = null;
 let currentPracticeSkill = 'listening';
 let speakingTimerInterval = null;
+const listeningPlaybackState = {
+    script: [],
+    index: 0,
+    isPlaying: false,
+    isPaused: false,
+    playButton: null,
+    activeUtterance: null,
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     initialisePage();
@@ -507,6 +515,9 @@ function renderPracticeView(skill) {
     if (!container) {
         return;
     }
+    if (skill !== 'listening') {
+        stopListeningPlayback(true);
+    }
     if (!practiceData) {
         container.innerHTML = '<p class="practice-note">正在准备练习数据...</p>';
         return;
@@ -541,7 +552,12 @@ function renderPracticeView(skill) {
 
 
 function renderListeningPractice(data) {
+    stopListeningPlayback();
     const container = document.getElementById('practiceContent');
+    if (!container) {
+        return;
+    }
+
     const transcript = (data.audio_script || [])
         .map(
             (line) => `
@@ -553,14 +569,67 @@ function renderListeningPractice(data) {
         )
         .join('');
 
+    const keyPhrases = (data.key_phrases || [])
+        .map((item) => `
+            <span class="key-phrase-pill">
+                <strong>${item.phrase}</strong>
+                ${item.note ? `<span class="key-phrase-note">${item.note}</span>` : ''}
+            </span>
+        `)
+        .join('');
+
+    const keyPhraseSection = keyPhrases
+        ? `
+            <div class="practice-section key-phrase-section">
+                <h4>场景关键词</h4>
+                <div class="key-phrase-list">${keyPhrases}</div>
+            </div>
+        `
+        : '';
+
+    const transcriptSection = transcript
+        ? `
+            <div class="transcript-toggle">
+                <button type="button" id="toggleTranscriptBtn">显示原文</button>
+            </div>
+            <div class="transcript-box collapsed" id="listeningTranscriptBox">${transcript}</div>
+        `
+        : '';
+
+    const durationLabel = data.audio_duration_seconds
+        ? `<span class="audio-duration">约 ${Math.round(data.audio_duration_seconds)} 秒</span>`
+        : '';
+
+    const audioElement = data.audio_url
+        ? `<audio controls preload="metadata" src="${data.audio_url}" class="listening-audio"></audio>`
+        : '';
+
+    const audioNote = data.audio_url
+        ? '<p class="practice-note audio-note">如需逐句精听，可重复播放或使用下方 AI 语音播报功能。</p>'
+        : '<p class="practice-note audio-note">当前提供浏览器语音合成播报，如无声音请确认浏览器支持 SpeechSynthesis。</p>';
+
     container.innerHTML = `
-        <div class="practice-card">
-            <div>
+        <div class="practice-card listening-card">
+            <div class="listening-header">
                 <h3>${data.title}</h3>
                 <p class="practice-note">${data.description}</p>
                 ${data.context ? `<p class="practice-note">练习提示：${data.context}</p>` : ''}
+                ${data.audio_summary ? `<p class="practice-note">${data.audio_summary}</p>` : ''}
             </div>
-            <div class="transcript-box">${transcript}</div>
+            <div class="listening-audio-box">
+                <div class="audio-box-header">
+                    <h4>音频播放</h4>
+                    ${durationLabel}
+                </div>
+                ${audioElement}
+                <div class="audio-button-group">
+                    <button type="button" id="listeningPlayBtn">播放对话</button>
+                    <button type="button" id="listeningStopBtn">停止播报</button>
+                </div>
+                ${audioNote}
+            </div>
+            ${keyPhraseSection}
+            ${transcriptSection}
             <form id="listeningPracticeForm">
                 ${buildQuestionHtml(data)}
                 <div class="practice-actions">
@@ -571,10 +640,191 @@ function renderListeningPractice(data) {
         </div>
     `;
 
+    setupListeningPlayback(data.audio_script || []);
+    setupTranscriptToggle();
+
     const form = document.getElementById('listeningPracticeForm');
     form.addEventListener('submit', (event) =>
         handleMultipleChoiceSubmit(event, data, '/api/ielts/interactive/listening/evaluate', 'listeningResult'),
     );
+}
+
+
+function setupTranscriptToggle() {
+    const toggleBtn = document.getElementById('toggleTranscriptBtn');
+    const transcriptBox = document.getElementById('listeningTranscriptBox');
+    if (!toggleBtn || !transcriptBox) {
+        return;
+    }
+    toggleBtn.addEventListener('click', () => {
+        const isCollapsed = transcriptBox.classList.toggle('collapsed');
+        toggleBtn.textContent = isCollapsed ? '显示原文' : '隐藏原文';
+    });
+}
+
+
+function setupListeningPlayback(script) {
+    const playBtn = document.getElementById('listeningPlayBtn');
+    const stopBtn = document.getElementById('listeningStopBtn');
+    listeningPlaybackState.playButton = playBtn || null;
+
+    if (!playBtn) {
+        return;
+    }
+
+    if (!('speechSynthesis' in window)) {
+        playBtn.disabled = true;
+        playBtn.textContent = '浏览器不支持语音播报';
+        if (stopBtn) {
+            stopBtn.disabled = true;
+            stopBtn.classList.add('disabled');
+        }
+        return;
+    }
+
+    playBtn.disabled = false;
+    playBtn.textContent = '播放对话';
+    playBtn.addEventListener('click', () => handleListeningPlayClick(script));
+
+    if (stopBtn) {
+        stopBtn.disabled = false;
+        stopBtn.classList.remove('disabled');
+        stopBtn.addEventListener('click', () => {
+            stopListeningPlayback();
+            updateListeningPlayButton();
+        });
+    }
+
+    updateListeningPlayButton();
+}
+
+
+function handleListeningPlayClick(script) {
+    if (!('speechSynthesis' in window)) {
+        return;
+    }
+
+    if (!listeningPlaybackState.isPlaying) {
+        startListeningPlayback(script);
+    } else if (listeningPlaybackState.isPaused) {
+        window.speechSynthesis.resume();
+        listeningPlaybackState.isPaused = false;
+    } else {
+        window.speechSynthesis.pause();
+        listeningPlaybackState.isPaused = true;
+    }
+    updateListeningPlayButton();
+}
+
+
+function startListeningPlayback(script) {
+    if (!('speechSynthesis' in window)) {
+        return;
+    }
+
+    const sanitized = (script || [])
+        .filter((line) => line && line.text)
+        .map((line) => ({
+            speaker: line.speaker || 'Speaker',
+            text: String(line.text).replace(/\s+/g, ' ').trim(),
+        }));
+
+    if (!sanitized.length) {
+        return;
+    }
+
+    if (listeningPlaybackState.isPlaying) {
+        window.speechSynthesis.cancel();
+    }
+
+    listeningPlaybackState.script = sanitized;
+    listeningPlaybackState.index = 0;
+    listeningPlaybackState.isPlaying = true;
+    listeningPlaybackState.isPaused = false;
+    speakNextListeningLine();
+}
+
+
+function speakNextListeningLine() {
+    if (!('speechSynthesis' in window)) {
+        return;
+    }
+    if (!listeningPlaybackState.isPlaying || listeningPlaybackState.isPaused) {
+        return;
+    }
+
+    const currentLine = listeningPlaybackState.script[listeningPlaybackState.index];
+    if (!currentLine) {
+        stopListeningPlayback();
+        return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(`${currentLine.speaker} says: ${currentLine.text}`);
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.onend = () => {
+        listeningPlaybackState.activeUtterance = null;
+        if (!listeningPlaybackState.isPlaying) {
+            return;
+        }
+        listeningPlaybackState.index += 1;
+        if (listeningPlaybackState.index >= listeningPlaybackState.script.length) {
+            stopListeningPlayback();
+        } else {
+            speakNextListeningLine();
+        }
+    };
+    utterance.onerror = () => {
+        listeningPlaybackState.activeUtterance = null;
+        stopListeningPlayback();
+    };
+
+    listeningPlaybackState.activeUtterance = utterance;
+    window.speechSynthesis.speak(utterance);
+    updateListeningPlayButton();
+}
+
+
+function stopListeningPlayback(clearButton = false) {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+    }
+    listeningPlaybackState.script = [];
+    listeningPlaybackState.index = 0;
+    listeningPlaybackState.isPlaying = false;
+    listeningPlaybackState.isPaused = false;
+    listeningPlaybackState.activeUtterance = null;
+    if (listeningPlaybackState.playButton) {
+        listeningPlaybackState.playButton.disabled = false;
+        listeningPlaybackState.playButton.textContent = '播放对话';
+        if (clearButton) {
+            listeningPlaybackState.playButton = null;
+        }
+    } else if (clearButton) {
+        listeningPlaybackState.playButton = null;
+    }
+}
+
+
+function updateListeningPlayButton() {
+    const btn = listeningPlaybackState.playButton;
+    if (!btn) {
+        return;
+    }
+    if (!('speechSynthesis' in window)) {
+        btn.disabled = true;
+        btn.textContent = '浏览器不支持语音播报';
+        return;
+    }
+
+    btn.disabled = false;
+    if (!listeningPlaybackState.isPlaying) {
+        btn.textContent = '播放对话';
+    } else if (listeningPlaybackState.isPaused) {
+        btn.textContent = '继续播报';
+    } else {
+        btn.textContent = '暂停播报';
+    }
 }
 
 
@@ -820,7 +1070,7 @@ async function handleMultipleChoiceSubmit(event, practice, endpoint, resultId) {
             throw new Error(message || '评估失败');
         }
         const data = await response.json();
-        renderMultipleChoiceResult(data, resultBox);
+        renderMultipleChoiceResult(data, resultBox, practice);
     } catch (error) {
         console.error(error);
         resultBox.innerHTML = `<span class="error">${error.message}</span>`;
@@ -828,7 +1078,7 @@ async function handleMultipleChoiceSubmit(event, practice, endpoint, resultId) {
 }
 
 
-function renderMultipleChoiceResult(result, container) {
+function renderMultipleChoiceResult(result, container, practice) {
     const breakdown = (result.breakdown || [])
         .map((item) => `
             <li class="${item.correct ? 'correct' : 'incorrect'}">
@@ -842,12 +1092,230 @@ function renderMultipleChoiceResult(result, container) {
     const tips = (result.tips || []).map((tip) => `<li>${tip}</li>`).join('');
     const nextSteps = (result.next_steps || []).map((step) => `<li>${step}</li>`).join('');
 
+    const aiBlock = practice && practice.id
+        ? `
+            <div class="ai-coach-block">
+                <button type="button" class="ai-coach-btn" data-practice="${practice.id}" data-skill="${result.skill}">
+                    生成 AI 讲解（Gemini 2.5 Flash）
+                </button>
+                <div class="ai-coach-output" id="${practice.id}-ai-feedback" style="display:none;"></div>
+            </div>
+        `
+        : '';
+
     container.innerHTML = `
         <div class="result-summary">得分：${result.score}/${result.total}（${result.percentage}%）</div>
         <ul class="breakdown-list">${breakdown}</ul>
         ${tips ? `<div class="practice-section"><h4>技巧提示</h4><ul class="tips-list">${tips}</ul></div>` : ''}
         ${nextSteps ? `<div class="practice-section"><h4>下一步建议</h4><ul class="tips-list">${nextSteps}</ul></div>` : ''}
+        ${aiBlock}
     `;
+
+    setupAiCoachButton(result, practice, container);
+}
+
+
+function setupAiCoachButton(result, practice, container) {
+    if (!practice || !practice.id) {
+        return;
+    }
+    const button = container.querySelector(`.ai-coach-btn[data-practice="${practice.id}"]`);
+    const output = container.querySelector(`#${practice.id}-ai-feedback`);
+    if (!button || !output) {
+        return;
+    }
+    button.addEventListener('click', () => handleAiCoachRequest(result, practice, output, button));
+}
+
+
+async function handleAiCoachRequest(result, practice, output, button) {
+    if (button.disabled) {
+        return;
+    }
+
+    output.style.display = 'block';
+    output.innerHTML = 'Gemini 正在生成解析，请稍候...';
+    button.disabled = true;
+
+    try {
+        const prompt = buildAiCoachPrompt(result, practice);
+        const response = await fetch('/api/ai-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                provider: 'gemini',
+                model: 'gemini-2.5-flash',
+                prompt,
+                system: 'You are a supportive IELTS coach. Respond in Chinese using concise Markdown headings and bullet points.',
+            }),
+        });
+
+        if (!response.ok) {
+            const message = await response.text();
+            throw new Error(message || 'AI 服务暂不可用');
+        }
+
+        const data = await response.json();
+        const text = data?.response ? data.response.trim() : '';
+
+        if (!text) {
+            output.innerHTML = '<span class="error">AI 未返回内容，请稍后再试。</span>';
+        } else {
+            output.innerHTML = formatAiCoachResponse(text);
+        }
+
+        if (window.usageTracker && data) {
+            usageTracker.recordUsage(
+                'ielts-study-system',
+                data.provider || 'gemini',
+                data.model || 'gemini-2.5-flash',
+                data.inputTokens || 0,
+                data.outputTokens || 0,
+            );
+        }
+    } catch (error) {
+        console.error(error);
+        output.innerHTML = `<span class="error">AI 解析失败：${error.message}</span>`;
+    } finally {
+        button.disabled = false;
+    }
+}
+
+
+function buildAiCoachPrompt(result, practice) {
+    const skillName = skillLabels[result.skill] || result.skill;
+    const correctCount = (result.breakdown || []).filter((item) => item.correct).length;
+    const incorrectItems = (result.breakdown || [])
+        .filter((item) => !item.correct)
+        .map((item, index) =>
+            `${index + 1}. 题干：${item.question}\n   学生答案：${item.user_answer || '未作答'}\n   正确答案：${item.correct_answer}\n   官方解析：${item.explanation || '无'}`,
+        )
+        .join('\n');
+
+    const questionDigest = (result.breakdown || [])
+        .map((item, index) =>
+            `${index + 1}. 题干：${item.question}\n   学生答案：${item.user_answer || '未作答'}\n   正确答案：${item.correct_answer}\n   原始解析：${item.explanation || '无'}`,
+        )
+        .join('\n');
+
+    const tips = Array.isArray(practice?.tips) && practice.tips.length ? practice.tips.join('；') : '';
+    const nextSteps = Array.isArray(practice?.next_steps) && practice.next_steps.length ? practice.next_steps.join('；') : '';
+    const keyPhrases = Array.isArray(practice?.key_phrases) && practice.key_phrases.length
+        ? practice.key_phrases
+              .map((item) => `${item.phrase}${item.note ? `（${item.note}）` : ''}`)
+              .join('；')
+        : '';
+
+    const sectionsInstruction = result.skill === 'listening'
+        ? '围绕「场景概要」「错题复盘」「听力技巧与下一步训练」三个小节组织回答。'
+        : '请包含「核心考点」「错题复盘」「下一步训练」三个小节。';
+
+    return `# flashmvp::Gemini-2.5-Flash 指令
+你是 flashmvp IELTS 学习系统中的资深${skillName}教练。
+当前通过 flashmvp LLM Gateway 调用了 Gemini 2.5 Flash API，请在回复开头用一句话明确告诉学员你使用的是 Gemini 2.5 Flash 生成的讲解。
+
+[练习信息]
+- 标题：${practice.title}
+- 描述：${practice.description || '（无描述）'}
+${practice.context ? `- 练习提示：${practice.context}` : ''}
+${practice.audio_summary ? `- 音频概要：${practice.audio_summary}` : ''}
+${keyPhrases ? `- 场景关键词：${keyPhrases}` : ''}
+
+[成绩数据]
+- 得分：${result.score}/${result.total}（${result.percentage}%）
+- 答对题目数：${correctCount}
+- 错题数：${(result.breakdown || []).length - correctCount}
+
+[题目明细]
+${questionDigest || '全部答对'}
+
+${incorrectItems ? `[错题重点]\n${incorrectItems}` : '[错题重点]\n全部答对，请提供巩固建议'}
+${tips ? `\n[原始技巧提示] ${tips}` : ''}
+${nextSteps ? `\n[推荐后续任务] ${nextSteps}` : ''}
+
+输出要求：
+- ${sectionsInstruction}
+- 先肯定亮点，再给出针对性的改进建议。
+- 对每道错题说明应抓取的听力或阅读线索，如需要可引用英文原句片段。
+- 提供至少两条课后自学建议，可结合听力复述、词汇积累或延伸练习。
+- 全程使用中文输出，保留必要的英文关键词，并使用 Markdown 标题和列表。
+`;
+}
+
+
+function formatAiCoachResponse(text) {
+    const lines = text.trim().split(/\r?\n/);
+    const htmlParts = [];
+    let buffer = [];
+    let listType = null;
+
+    const flushBuffer = () => {
+        if (!buffer.length) {
+            return;
+        }
+        const items = buffer.map((item) => `<li>${formatAiInline(item)}</li>`).join('');
+        htmlParts.push(listType === 'ol' ? `<ol>${items}</ol>` : `<ul>${items}</ul>`);
+        buffer = [];
+        listType = null;
+    };
+
+    lines.forEach((rawLine) => {
+        const line = rawLine.trim();
+        if (!line) {
+            flushBuffer();
+            return;
+        }
+
+        if (/^#{1,6}\s+/.test(line)) {
+            flushBuffer();
+            const level = Math.min(line.match(/^#{1,6}/)[0].length + 2, 5);
+            const content = formatAiInline(line.replace(/^#{1,6}\s+/, ''));
+            htmlParts.push(`<h${level}>${content}</h${level}>`);
+            return;
+        }
+
+        if (/^\d+[\.)]\s+/.test(line)) {
+            const content = line.replace(/^\d+[\.)]\s+/, '');
+            if (listType !== 'ol') {
+                flushBuffer();
+                listType = 'ol';
+            }
+            buffer.push(content);
+            return;
+        }
+
+        if (/^[-*•]\s+/.test(line)) {
+            const content = line.replace(/^[-*•]\s+/, '');
+            if (listType !== 'ul') {
+                flushBuffer();
+                listType = 'ul';
+            }
+            buffer.push(content);
+            return;
+        }
+
+        flushBuffer();
+        htmlParts.push(`<p>${formatAiInline(line)}</p>`);
+    });
+
+    flushBuffer();
+    return htmlParts.join('');
+}
+
+
+function formatAiInline(text) {
+    const escaped = escapeHtml(text);
+    return escaped
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+
+function escapeHtml(value) {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }
 
 
@@ -1044,3 +1512,6 @@ function formatSeconds(value) {
     const seconds = String(value % 60).padStart(2, '0');
     return `${minutes}:${seconds}`;
 }
+
+
+window.addEventListener('beforeunload', () => stopListeningPlayback(true));
