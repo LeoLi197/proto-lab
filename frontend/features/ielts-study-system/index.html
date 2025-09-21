@@ -9,18 +9,72 @@
 </head>
 <body>
     <div class="feature-container ielts-container">
-        <header class="page-header">
-            <div>
+        <header class="hero">
+            <div class="hero-copy">
+                <a class="back-link" href="../../dashboard.html">← 返回功能中心</a>
                 <h1>IELTS 情景化学习系统</h1>
-                <p class="intro">上传真实单词照片后，系统自动生成场景故事，并同步构建听力、阅读与对话训练，让每一个词汇都在具体语境中被反复使用。</p>
+                <p class="intro">上传真实单词照片后，Gemini 会自动完成 OCR、场景故事、听力阅读与对话设计，让每一个词汇在情境中反复出现。</p>
+                <div class="hero-badges">
+                    <span class="hero-badge">Gemini OCR 驱动</span>
+                    <span class="hero-badge">多模态场景生成</span>
+                    <span class="hero-badge">听说读写联动</span>
+                </div>
             </div>
-            <a class="back-link" href="../../dashboard.html">← 返回功能中心</a>
+            <div class="module-grid">
+                <div class="module-card accent-listening">
+                    <span class="module-icon">🎧</span>
+                    <div>
+                        <h3>听说</h3>
+                        <p>语音脚本、听写题与口语追问</p>
+                    </div>
+                </div>
+                <div class="module-card accent-reading">
+                    <span class="module-icon">📖</span>
+                    <div>
+                        <h3>阅读</h3>
+                        <p>场景文章、段落定位与词汇表</p>
+                    </div>
+                </div>
+                <div class="module-card accent-vocab">
+                    <span class="module-icon">💬</span>
+                    <div>
+                        <h3>词汇</h3>
+                        <p>逐词提示，确保全部覆盖</p>
+                    </div>
+                </div>
+                <div class="module-card accent-grammar">
+                    <span class="module-icon">🧠</span>
+                    <div>
+                        <h3>语法</h3>
+                        <p>故事中嵌入高频结构</p>
+                    </div>
+                </div>
+                <div class="module-card accent-career">
+                    <span class="module-icon">💼</span>
+                    <div>
+                        <h3>职场</h3>
+                        <p>求职场景化问答演练</p>
+                    </div>
+                </div>
+                <div class="module-card accent-family">
+                    <span class="module-icon">📚</span>
+                    <div>
+                        <h3>亲子</h3>
+                        <p>生活化话题轻松输出</p>
+                    </div>
+                </div>
+            </div>
         </header>
 
         <main>
-            <section id="uploadPanel" class="panel">
-                <h2>上传板块 · 构建学习语料</h2>
-                <p>支持批量上传学习资料照片，可额外输入自定义词汇或情景提示，生成器会输出完整文章与练习方案。</p>
+            <section id="uploadPanel" class="panel upload-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>上传与生成</h2>
+                        <p>支持批量上传学习资料照片，可额外输入自定义词汇或情景提示，Gemini 会返回完整文章与练习方案。</p>
+                    </div>
+                    <span id="uploadStatusFlag" class="status-flag">待开始</span>
+                </div>
                 <form id="uploadForm" class="form-grid" enctype="multipart/form-data">
                     <div class="form-group form-group-full">
                         <label for="wordImages">上传单词照片</label>
@@ -35,14 +89,19 @@
                         <label for="scenarioHint">情景提示（选填）</label>
                         <input type="text" id="scenarioHint" placeholder="例如：校园迎新、研究所参观、职业规划会">
                     </div>
+                    <div class="progress-wrapper" id="uploadProgressWrapper" style="display:none;">
+                        <div class="progress-bar"><span id="uploadProgressFill"></span></div>
+                        <span id="uploadProgressText">0%</span>
+                    </div>
                     <div class="form-actions form-group-full">
                         <button type="submit" id="uploadBtn">生成学习素材</button>
                     </div>
+                    <div class="upload-feedback" id="uploadFeedback"></div>
                 </form>
                 <div id="uploadSummary" class="result-box" style="display:none;"></div>
             </section>
 
-            <section id="listeningPanel" class="panel module-block">
+            <section id="listeningPanel" class="panel module-block accent-listening-block">
                 <div class="panel-heading">
                     <h2>听力板块 · 语音理解与拼写</h2>
                     <span id="listeningStatus" class="status-pill">等待生成</span>
@@ -52,7 +111,7 @@
                 </div>
             </section>
 
-            <section id="readingPanel" class="panel module-block">
+            <section id="readingPanel" class="panel module-block accent-reading-block">
                 <div class="panel-heading">
                     <h2>阅读板块 · 精读与词汇定位</h2>
                     <span id="readingStatus" class="status-pill">等待生成</span>
@@ -62,7 +121,7 @@
                 </div>
             </section>
 
-            <section id="conversationPanel" class="panel module-block">
+            <section id="conversationPanel" class="panel module-block accent-conversation-block">
                 <div class="panel-heading">
                     <h2>对话板块 · 语音互动</h2>
                     <span id="conversationStatus" class="status-pill">等待生成</span>
@@ -80,43 +139,177 @@
     <script src="../../usage.js"></script>
     <script src="./script.js"></script>
     <style>
-        .page-header {
+        body.ielts-theme {
+            background: #f5f7ff;
+        }
+        .hero {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 28px;
+            padding: 32px;
+            margin-bottom: 32px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, #4f5fff 0%, #7f8dff 40%, #f2f3ff 100%);
+            color: #fff;
+        }
+        .hero-copy .back-link {
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+            margin-bottom: 12px;
+            display: inline-block;
+        }
+        .hero h1 {
+            font-size: 2.2rem;
+            margin-bottom: 12px;
+        }
+        .hero .intro {
+            max-width: 520px;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+        .hero-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .hero-badge {
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(6px);
+            font-size: 0.85rem;
+        }
+        .module-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+        .module-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            border-radius: 18px;
+            color: #1f1f3d;
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: 0 10px 24px rgba(30, 42, 200, 0.16);
+        }
+        .module-card h3 {
+            margin: 0 0 6px;
+            font-size: 1.1rem;
+        }
+        .module-card p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: rgba(31, 31, 61, 0.7);
+        }
+        .module-icon {
+            font-size: 1.8rem;
+        }
+        .accent-listening { background: linear-gradient(135deg, #e5e9ff, #f5f7ff); }
+        .accent-reading { background: linear-gradient(135deg, #ffe5ec, #fff5f9); }
+        .accent-vocab { background: linear-gradient(135deg, #e5fff4, #f5fffb); }
+        .accent-grammar { background: linear-gradient(135deg, #fff2d9, #fff9ed); }
+        .accent-career { background: linear-gradient(135deg, #e8f3ff, #f3f9ff); }
+        .accent-family { background: linear-gradient(135deg, #f7e8ff, #fbf3ff); }
+        .upload-panel {
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 18px 36px rgba(79, 95, 255, 0.08);
+            padding: 28px;
+        }
+        .panel-header {
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
-            gap: 24px;
+            gap: 16px;
+            margin-bottom: 16px;
         }
-        .page-header .intro {
-            max-width: 680px;
-            color: #4a4a4a;
+        .panel-header p {
+            margin-top: 6px;
+            color: #4a4f75;
         }
+        .status-flag {
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: #f0f1ff;
+            color: #2f3dbf;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        .status-flag.loading { background: #eef2ff; color: #3142c6; }
+        .status-flag.success { background: #d7f5e0; color: #0f8d3a; }
+        .status-flag.error { background: #fde2e1; color: #d93025; }
+        .progress-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            flex: 1;
+            height: 8px;
+            border-radius: 999px;
+            background: #e5e7ff;
+            overflow: hidden;
+        }
+        .progress-bar span {
+            display: block;
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #4f5fff, #7a8aff);
+            transition: width 0.3s ease;
+        }
+        .upload-feedback {
+            margin-top: 8px;
+            min-height: 20px;
+            font-size: 0.9rem;
+            color: #2f3dbf;
+        }
+        .upload-feedback.error {
+            color: #d93025;
+        }
+        .upload-feedback.success {
+            color: #0f8d3a;
+        }
+        .module-block {
+            border-radius: 18px;
+            padding: 24px;
+            margin-top: 28px;
+        }
+        .accent-listening-block { background: linear-gradient(135deg, #f3f5ff, #ffffff); }
+        .accent-reading-block { background: linear-gradient(135deg, #fff5f8, #ffffff); }
+        .accent-conversation-block { background: linear-gradient(135deg, #f5fffb, #ffffff); }
         .module-block .panel-heading {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 16px;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
         .status-pill {
             display: inline-flex;
             align-items: center;
-            padding: 4px 10px;
-            background: #eef2ff;
-            color: #3142c6;
+            gap: 6px;
+            padding: 4px 12px;
             border-radius: 999px;
             font-size: 0.85rem;
+            background: #eef2ff;
+            color: #3142c6;
         }
-        .status-pill.ready {
-            background: #d7f5e0;
-            color: #0f8d3a;
+        .status-pill.ready { background: #d7f5e0; color: #0f8d3a; }
+        .status-pill.waiting { background: #f4f4f5; color: #4a4a4a; }
+        .status-pill.error { background: #fde2e1; color: #d93025; }
+        .status-pill.loading::after {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 1s infinite;
         }
-        .status-pill.waiting {
-            background: #f4f4f5;
-            color: #4a4a4a;
-        }
-        .status-pill.error {
-            background: #fde2e1;
-            color: #d93025;
+        @keyframes pulse {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 1; }
         }
         .module-content .placeholder {
             color: #666;
@@ -145,10 +338,18 @@
             border: 1px solid #d6e4ff;
             font-size: 0.9rem;
         }
+        .meta-note {
+            font-size: 0.85rem;
+            color: #4a4f75;
+            margin-top: 6px;
+        }
+        .meta-note li {
+            margin-top: 4px;
+        }
         .question-card {
             border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 12px 16px;
+            border-radius: 12px;
+            padding: 14px 16px;
             margin-bottom: 12px;
             background: #fff;
         }
@@ -172,7 +373,7 @@
             margin: 12px 0;
             padding: 12px;
             background: #f6f9ff;
-            border-radius: 10px;
+            border-radius: 12px;
             border: 1px solid #dbe4ff;
         }
         .segment-list {
@@ -181,8 +382,8 @@
             gap: 8px;
         }
         .segment-item {
-            padding: 8px 10px;
-            border-radius: 8px;
+            padding: 10px 12px;
+            border-radius: 10px;
             background: #f9fafb;
             border: 1px solid #e2e8f0;
             font-size: 0.9rem;
@@ -194,9 +395,9 @@
             margin-top: 12px;
         }
         .glossary-card {
-            padding: 10px 12px;
+            padding: 12px 14px;
             border: 1px solid #e2e8f0;
-            border-radius: 8px;
+            border-radius: 10px;
             background: #fff;
             font-size: 0.9rem;
         }
@@ -207,7 +408,7 @@
         }
         .agenda-card {
             border: 1px dashed #d3def8;
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 12px;
             background: #fbfdff;
         }
@@ -216,10 +417,11 @@
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            padding: 10px 12px;
-            border-radius: 8px;
+            padding: 12px 14px;
+            border-radius: 10px;
             border: 1px solid #e2e8f0;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
+            background: #fff;
         }
         .voice-row button {
             padding: 6px 12px;
@@ -228,6 +430,9 @@
             color: #fff;
             border: none;
             cursor: pointer;
+        }
+        .voice-row button:hover {
+            background: #202fb8;
         }
         .evaluation-box {
             margin-top: 16px;
@@ -240,11 +445,15 @@
             margin: 8px 0 0;
             padding-left: 20px;
         }
-        .evaluation-box li.correct {
-            color: #0f8d3a;
-        }
-        .evaluation-box li.incorrect {
-            color: #d93025;
+        .evaluation-box li.correct { color: #0f8d3a; }
+        .evaluation-box li.incorrect { color: #d93025; }
+        @media (max-width: 768px) {
+            .hero {
+                padding: 24px;
+            }
+            .module-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
         }
     </style>
 </body>
