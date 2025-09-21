@@ -8,6 +8,12 @@ let sessionPayload = null;
 let progressHideTimer = null;
 let activeConversationGuide = null;
 
+const AUDIO_SPEED_PRESETS = [0.75, 1, 1.25, 1.5];
+const DEFAULT_SPEED_INDEX = (() => {
+    const index = AUDIO_SPEED_PRESETS.indexOf(1);
+    return index >= 0 ? index : 0;
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('uploadForm').addEventListener('submit', handleUploadSubmit);
     setStatus('listeningStatus', '等待生成', 'waiting');
@@ -343,9 +349,32 @@ function renderListeningSection(listening) {
     }
 
     const { script, audio, segments, questions, metadata } = listening;
-    const audioHtml = audio.available && audio.base64
-        ? `<audio controls src="data:${audio.format};base64,${audio.base64}"></audio>`
-        : `<p class="hint">${escapeHtml(audio.message || '未生成音频，可使用浏览器朗读。')}</p>`;
+    const hasAudio = Boolean(audio && audio.available && audio.base64);
+    const noteMessage = typeof metadata?.notes === 'string' ? metadata.notes : '';
+    let audioHtml = '';
+    let audioNoteHtml = '';
+
+    if (hasAudio) {
+        const format = audio.format || 'audio/wav';
+        const defaultRate = AUDIO_SPEED_PRESETS[DEFAULT_SPEED_INDEX] || 1;
+        audioHtml = `
+            <div class="audio-player" data-has-audio="true">
+                <audio id="listeningAudio" preload="metadata" src="data:${format};base64,${audio.base64}"></audio>
+                <div class="audio-player-controls">
+                    <button type="button" id="listeningPlayBtn" class="audio-btn primary">▶ 开始播放</button>
+                    <button type="button" id="listeningSpeedBtn" class="audio-btn secondary"
+                        data-speed-index="${DEFAULT_SPEED_INDEX}">语速：${formatPlaybackRate(defaultRate)}x</button>
+                </div>
+                <p class="hint subtle">点击“开始播放”收听听力，可循环切换语速。</p>
+            </div>
+        `;
+        if (noteMessage) {
+            audioNoteHtml = `<p class="hint">${escapeHtml(noteMessage)}</p>`;
+        }
+    } else {
+        const fallbackMessage = noteMessage || audio.message || '未生成音频，可使用浏览器朗读。';
+        audioHtml = `<p class="hint">${escapeHtml(fallbackMessage)}</p>`;
+    }
 
     const segmentHtml = segments
         .map(
@@ -374,7 +403,7 @@ function renderListeningSection(listening) {
     container.innerHTML = `
         <div class="audio-box">
             ${audioHtml}
-            <p class="hint">${escapeHtml(metadata.notes || '')}</p>
+            ${audioNoteHtml}
         </div>
         <details open>
             <summary>听力脚本</summary>
@@ -392,8 +421,89 @@ function renderListeningSection(listening) {
         </form>
     `;
 
+    if (hasAudio) {
+        initListeningAudioControls();
+    }
     setStatus('listeningStatus', '已生成', 'ready');
     document.getElementById('listeningForm').addEventListener('submit', handleListeningSubmit);
+}
+
+function initListeningAudioControls() {
+    const audioEl = document.getElementById('listeningAudio');
+    const playBtn = document.getElementById('listeningPlayBtn');
+    const speedBtn = document.getElementById('listeningSpeedBtn');
+    if (!audioEl || !playBtn || !speedBtn) {
+        return;
+    }
+
+    const applySpeed = (index) => {
+        const total = AUDIO_SPEED_PRESETS.length;
+        const safeIndex = ((index % total) + total) % total;
+        const rate = AUDIO_SPEED_PRESETS[safeIndex] || 1;
+        audioEl.playbackRate = rate;
+        speedBtn.dataset.speedIndex = String(safeIndex);
+        speedBtn.textContent = `语速：${formatPlaybackRate(rate)}x`;
+    };
+
+    const resetPlayLabel = (label) => {
+        playBtn.textContent = label;
+        playBtn.classList.remove('is-playing');
+    };
+
+    playBtn.addEventListener('click', async () => {
+        if (audioEl.paused || audioEl.ended) {
+            if (audioEl.ended) {
+                audioEl.currentTime = 0;
+            }
+            try {
+                await audioEl.play();
+                playBtn.textContent = '⏸ 暂停';
+                playBtn.classList.add('is-playing');
+            } catch (err) {
+                console.error('音频播放失败', err);
+            }
+        } else {
+            audioEl.pause();
+        }
+    });
+
+    audioEl.addEventListener('pause', () => {
+        if (audioEl.ended || audioEl.currentTime === 0) {
+            resetPlayLabel('▶ 开始播放');
+        } else {
+            resetPlayLabel('▶ 继续播放');
+        }
+    });
+
+    audioEl.addEventListener('play', () => {
+        playBtn.textContent = '⏸ 暂停';
+        playBtn.classList.add('is-playing');
+    });
+
+    audioEl.addEventListener('ended', () => {
+        audioEl.currentTime = 0;
+        resetPlayLabel('▶ 重新播放');
+    });
+
+    speedBtn.addEventListener('click', () => {
+        const currentIndex = Number.parseInt(speedBtn.dataset.speedIndex || String(DEFAULT_SPEED_INDEX), 10);
+        applySpeed(currentIndex + 1);
+    });
+
+    const initialIndex = Number.parseInt(speedBtn.dataset.speedIndex || String(DEFAULT_SPEED_INDEX), 10);
+    applySpeed(Number.isNaN(initialIndex) ? DEFAULT_SPEED_INDEX : initialIndex);
+    resetPlayLabel('▶ 开始播放');
+}
+
+function formatPlaybackRate(rate) {
+    if (!Number.isFinite(rate)) {
+        return '1.0';
+    }
+    if (Math.abs(rate % 1) < 1e-8) {
+        return rate.toFixed(1);
+    }
+    const formatted = rate.toFixed(2);
+    return formatted.endsWith('0') ? formatted.slice(0, -1) : formatted;
 }
 
 function renderReadingSection(reading) {
