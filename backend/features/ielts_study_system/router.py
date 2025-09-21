@@ -216,6 +216,128 @@ def _encode_image(image: Image.Image) -> str:
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
+def _extract_code_fence_content(text: str) -> Optional[str]:
+    """Return the content of the first markdown code fence if present."""
+
+    match = re.search(r"```(?:json)?\s*([\s\S]+?)```", text, flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return None
+
+
+def _enumerate_json_candidates(raw: str) -> Iterable[str]:
+    """Yield plausible JSON substrings from a raw model response."""
+
+    trimmed = raw.strip()
+    if trimmed:
+        yield trimmed
+
+    fenced = _extract_code_fence_content(trimmed)
+    if fenced:
+        yield fenced
+
+    sources: List[str] = []
+    for item in (trimmed, fenced):
+        if item and item not in sources:
+            sources.append(item)
+
+    for candidate_source in sources:
+        stack: List[str] = []
+        start: Optional[int] = None
+        in_string = False
+        escape = False
+        for index, char in enumerate(candidate_source):
+            if in_string:
+                if escape:
+                    escape = False
+                elif char == "\\":
+                    escape = True
+                elif char == '"':
+                    in_string = False
+                continue
+            if char == '"':
+                in_string = True
+                continue
+            if char in "{[":
+                if not stack:
+                    start = index
+                stack.append('}' if char == '{' else ']')
+            elif char in "}]":
+                if stack and char == stack[-1]:
+                    stack.pop()
+                    if not stack and start is not None:
+                        fragment = candidate_source[start : index + 1].strip()
+                        if fragment:
+                            yield fragment
+                        start = None
+                else:
+                    stack.clear()
+                    start = None
+
+
+def _remove_trailing_commas(candidate: str) -> str:
+    """Remove trailing commas before closing tokens outside of strings."""
+
+    result: List[str] = []
+    in_string = False
+    escape = False
+    index = 0
+    length = len(candidate)
+    while index < length:
+        char = candidate[index]
+        if in_string:
+            result.append(char)
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            index += 1
+            continue
+        if char == '"':
+            in_string = True
+            result.append(char)
+            index += 1
+            continue
+        if char == ',':
+            look_ahead = index + 1
+            while look_ahead < length and candidate[look_ahead].isspace():
+                look_ahead += 1
+            if look_ahead < length and candidate[look_ahead] in "}]":
+                index = look_ahead
+                while index < length and candidate[index].isspace():
+                    index += 1
+                continue
+        result.append(char)
+        index += 1
+    return "".join(result)
+
+
+def _parse_gemini_json(raw: str) -> object:
+    """Attempt to parse Gemini output into JSON, repairing common issues."""
+
+    seen: set[str] = set()
+    for candidate in _enumerate_json_candidates(raw):
+        fragment = candidate.strip()
+        if not fragment or fragment in seen:
+            continue
+        seen.add(fragment)
+        try:
+            return json.loads(fragment)
+        except json.JSONDecodeError:
+            repaired = _remove_trailing_commas(fragment)
+            if repaired != fragment and repaired not in seen:
+                seen.add(repaired)
+                try:
+                    return json.loads(repaired)
+                except json.JSONDecodeError:
+                    continue
+    snippet = raw.strip().replace("\n", " ")
+    snippet = snippet[:180] + ("…" if len(snippet) > 180 else "")
+    raise ValueError(f"模型返回的内容无法解析为 JSON：{snippet}")
+
+
 async def _perform_ocr_via_gemini(image: Image.Image, filename: str) -> Tuple[List[str], Optional[str]]:
     encoded = _encode_image(image)
     prompt = (
@@ -229,9 +351,11 @@ async def _perform_ocr_via_gemini(image: Image.Image, filename: str) -> Tuple[Li
     )
     raw = await run_in_threadpool(_call_gemini_sync, prompt, [encoded], "application/json")
     try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
+        payload = _parse_gemini_json(raw)
+    except ValueError as exc:
         raise OCRUnavailableError(f"Gemini OCR 返回不可解析的 JSON：{exc}") from exc
+    if not isinstance(payload, dict):
+        raise OCRUnavailableError("Gemini OCR 未返回 JSON 对象，请稍后重试。")
 
     words: List[str] = []
     for token in payload.get("words", []):
@@ -602,8 +726,8 @@ async def _generate_materials_via_gemini(words: List[str], scenario_hint: Option
     prompt = _build_materials_prompt(words, scenario_hint)
     raw = await run_in_threadpool(_call_gemini_sync, prompt, None, "application/json")
     try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
+        payload = _parse_gemini_json(raw)
+    except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Gemini 输出解析失败：{exc}") from exc
     if not isinstance(payload, dict):
         raise HTTPException(status_code=502, detail="Gemini 输出格式异常，请稍后重试。")
