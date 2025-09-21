@@ -13,6 +13,11 @@ const DEFAULT_SPEED_INDEX = (() => {
     const index = AUDIO_SPEED_PRESETS.indexOf(1);
     return index >= 0 ? index : 0;
 })();
+const SPEECH_SYNTHESIS_SUPPORTED =
+    typeof window !== 'undefined' &&
+    'speechSynthesis' in window &&
+    'SpeechSynthesisUtterance' in window;
+let lastSpeechSpeedIndex = DEFAULT_SPEED_INDEX;
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('uploadForm').addEventListener('submit', handleUploadSubmit);
@@ -340,6 +345,16 @@ function renderUploadSummary(data) {
     `;
 }
 
+function stopActiveSpeechPlayback() {
+    if (SPEECH_SYNTHESIS_SUPPORTED && typeof window !== 'undefined') {
+        try {
+            window.speechSynthesis.cancel();
+        } catch (err) {
+            console.warn('取消语音合成时出错', err);
+        }
+    }
+}
+
 function renderListeningSection(listening) {
     const container = document.getElementById('listeningContent');
     if (!listening) {
@@ -348,15 +363,17 @@ function renderListeningSection(listening) {
         return;
     }
 
+    stopActiveSpeechPlayback();
+
     const { script, audio, segments, questions, metadata } = listening;
     const hasAudio = Boolean(audio && audio.available && audio.base64);
     const noteMessage = typeof metadata?.notes === 'string' ? metadata.notes : '';
     let audioHtml = '';
     let audioNoteHtml = '';
+    const defaultRate = AUDIO_SPEED_PRESETS[DEFAULT_SPEED_INDEX] || 1;
 
     if (hasAudio) {
         const format = audio.format || 'audio/wav';
-        const defaultRate = AUDIO_SPEED_PRESETS[DEFAULT_SPEED_INDEX] || 1;
         audioHtml = `
             <div class="audio-player" data-has-audio="true">
                 <audio id="listeningAudio" preload="metadata" src="data:${format};base64,${audio.base64}"></audio>
@@ -372,8 +389,25 @@ function renderListeningSection(listening) {
             audioNoteHtml = `<p class="hint">${escapeHtml(noteMessage)}</p>`;
         }
     } else {
-        const fallbackMessage = noteMessage || audio.message || '未生成音频，可使用浏览器朗读。';
-        audioHtml = `<p class="hint">${escapeHtml(fallbackMessage)}</p>`;
+        const fallbackMessage = noteMessage || audio?.message || '未生成音频，可使用浏览器朗读。';
+        const disabledAttr = SPEECH_SYNTHESIS_SUPPORTED ? '' : ' disabled';
+        const playLabel = SPEECH_SYNTHESIS_SUPPORTED ? '▶ 开始播放' : '浏览器不支持播放';
+        const speedLabel = `语速：${formatPlaybackRate(defaultRate)}x`;
+        const synthHint = SPEECH_SYNTHESIS_SUPPORTED
+            ? '使用浏览器朗读文本生成音频，支持语速切换。'
+            : '当前浏览器不支持语音朗读，请尝试更换浏览器或启用音频资源。';
+        audioHtml = `
+            <div class="audio-player" data-has-audio="false">
+                <div class="audio-player-controls">
+                    <button type="button" id="listeningPlayBtn" class="audio-btn primary"${disabledAttr}>${playLabel}</button>
+                    <button type="button" id="listeningSpeedBtn" class="audio-btn secondary" data-speed-index="${DEFAULT_SPEED_INDEX}"${disabledAttr}>${speedLabel}</button>
+                </div>
+                <p class="hint subtle">${synthHint}</p>
+            </div>
+        `;
+        if (fallbackMessage) {
+            audioNoteHtml = `<p class="hint">${escapeHtml(fallbackMessage)}</p>`;
+        }
     }
 
     const segmentHtml = segments
@@ -421,23 +455,30 @@ function renderListeningSection(listening) {
         </form>
     `;
 
-    if (hasAudio) {
-        initListeningAudioControls();
-    }
+    initListeningAudioControls({ hasFileAudio: hasAudio, script: script || '' });
     setStatus('listeningStatus', '已生成', 'ready');
     document.getElementById('listeningForm').addEventListener('submit', handleListeningSubmit);
 }
 
-function initListeningAudioControls() {
-    const audioEl = document.getElementById('listeningAudio');
+function initListeningAudioControls(options = {}) {
+    const { hasFileAudio = false, script = '' } = options;
     const playBtn = document.getElementById('listeningPlayBtn');
     const speedBtn = document.getElementById('listeningSpeedBtn');
-    if (!audioEl || !playBtn || !speedBtn) {
+    if (!playBtn || !speedBtn) {
         return;
     }
 
+    const audioEl = document.getElementById('listeningAudio');
+    if (hasFileAudio && audioEl) {
+        setupAudioElementControls(audioEl, playBtn, speedBtn);
+        return;
+    }
+    setupSpeechSynthesisControls(playBtn, speedBtn, script);
+}
+
+function setupAudioElementControls(audioEl, playBtn, speedBtn) {
     const applySpeed = (index) => {
-        const total = AUDIO_SPEED_PRESETS.length;
+        const total = AUDIO_SPEED_PRESETS.length || 1;
         const safeIndex = ((index % total) + total) % total;
         const rate = AUDIO_SPEED_PRESETS[safeIndex] || 1;
         audioEl.playbackRate = rate;
@@ -445,9 +486,12 @@ function initListeningAudioControls() {
         speedBtn.textContent = `语速：${formatPlaybackRate(rate)}x`;
     };
 
-    const resetPlayLabel = (label) => {
+    const updatePlayLabel = (label, isPlaying = false) => {
         playBtn.textContent = label;
-        playBtn.classList.remove('is-playing');
+        playBtn.classList.toggle('is-playing', Boolean(isPlaying));
+        if (!isPlaying) {
+            playBtn.classList.remove('is-playing');
+        }
     };
 
     playBtn.addEventListener('click', async () => {
@@ -457,42 +501,159 @@ function initListeningAudioControls() {
             }
             try {
                 await audioEl.play();
-                playBtn.textContent = '⏸ 暂停';
-                playBtn.classList.add('is-playing');
+                updatePlayLabel('⏸ 暂停', true);
             } catch (err) {
                 console.error('音频播放失败', err);
+                updatePlayLabel('▶ 继续播放');
             }
         } else {
             audioEl.pause();
+            updatePlayLabel('▶ 继续播放');
         }
     });
 
     audioEl.addEventListener('pause', () => {
         if (audioEl.ended || audioEl.currentTime === 0) {
-            resetPlayLabel('▶ 开始播放');
+            updatePlayLabel('▶ 开始播放');
         } else {
-            resetPlayLabel('▶ 继续播放');
+            updatePlayLabel('▶ 继续播放');
         }
     });
 
     audioEl.addEventListener('play', () => {
-        playBtn.textContent = '⏸ 暂停';
-        playBtn.classList.add('is-playing');
+        updatePlayLabel('⏸ 暂停', true);
     });
 
     audioEl.addEventListener('ended', () => {
         audioEl.currentTime = 0;
-        resetPlayLabel('▶ 重新播放');
+        updatePlayLabel('▶ 重新播放');
     });
 
     speedBtn.addEventListener('click', () => {
         const currentIndex = Number.parseInt(speedBtn.dataset.speedIndex || String(DEFAULT_SPEED_INDEX), 10);
-        applySpeed(currentIndex + 1);
+        const nextIndex = Number.isNaN(currentIndex) ? DEFAULT_SPEED_INDEX + 1 : currentIndex + 1;
+        applySpeed(nextIndex);
     });
 
     const initialIndex = Number.parseInt(speedBtn.dataset.speedIndex || String(DEFAULT_SPEED_INDEX), 10);
-    applySpeed(Number.isNaN(initialIndex) ? DEFAULT_SPEED_INDEX : initialIndex);
-    resetPlayLabel('▶ 开始播放');
+    const safeInitial = Number.isNaN(initialIndex) ? DEFAULT_SPEED_INDEX : initialIndex;
+    applySpeed(safeInitial);
+    updatePlayLabel('▶ 开始播放');
+}
+
+function setupSpeechSynthesisControls(playBtn, speedBtn, script) {
+    const trimmedScript = (script || '').trim();
+    const updatePlayLabel = (label, isPlaying = false) => {
+        playBtn.textContent = label;
+        playBtn.classList.toggle('is-playing', Boolean(isPlaying));
+        if (!isPlaying) {
+            playBtn.classList.remove('is-playing');
+        }
+    };
+
+    if (!trimmedScript) {
+        playBtn.disabled = true;
+        updatePlayLabel('暂无可播放的听力内容');
+        speedBtn.disabled = true;
+        speedBtn.textContent = '语速不可用';
+        return;
+    }
+
+    if (!SPEECH_SYNTHESIS_SUPPORTED) {
+        updatePlayLabel(playBtn.textContent || '浏览器不支持播放');
+        speedBtn.disabled = true;
+        speedBtn.textContent = '语速不可用';
+        return;
+    }
+
+    const synth = window.speechSynthesis;
+    let hasStarted = false;
+    let isPaused = false;
+
+    const applySpeed = (index) => {
+        const total = AUDIO_SPEED_PRESETS.length || 1;
+        const safeIndex = ((index % total) + total) % total;
+        const rate = AUDIO_SPEED_PRESETS[safeIndex] || 1;
+        lastSpeechSpeedIndex = safeIndex;
+        speedBtn.dataset.speedIndex = String(safeIndex);
+        speedBtn.textContent = `语速：${formatPlaybackRate(rate)}x`;
+        return rate;
+    };
+
+    const startSpeech = () => {
+        stopActiveSpeechPlayback();
+        const utterance = new SpeechSynthesisUtterance(trimmedScript);
+        utterance.rate = AUDIO_SPEED_PRESETS[lastSpeechSpeedIndex] || 1;
+        utterance.lang = detectSpeechLanguage(trimmedScript);
+        utterance.onend = () => {
+            hasStarted = false;
+            isPaused = false;
+            updatePlayLabel('▶ 重新播放');
+        };
+        utterance.onerror = (event) => {
+            console.error('语音合成失败', event);
+            hasStarted = false;
+            isPaused = false;
+            updatePlayLabel('▶ 重新播放');
+        };
+        utterance.onpause = () => {
+            isPaused = true;
+            updatePlayLabel('▶ 继续播放');
+        };
+        utterance.onresume = () => {
+            isPaused = false;
+            updatePlayLabel('⏸ 暂停', true);
+        };
+        synth.speak(utterance);
+        hasStarted = true;
+        isPaused = false;
+        updatePlayLabel('⏸ 暂停', true);
+    };
+
+    playBtn.addEventListener('click', () => {
+        if (!hasStarted && !synth.speaking) {
+            startSpeech();
+            return;
+        }
+        if (synth.paused || isPaused) {
+            synth.resume();
+            isPaused = false;
+            updatePlayLabel('⏸ 暂停', true);
+            return;
+        }
+        if (synth.speaking) {
+            synth.pause();
+            isPaused = true;
+            updatePlayLabel('▶ 继续播放');
+            return;
+        }
+        startSpeech();
+    });
+
+    speedBtn.addEventListener('click', () => {
+        const nextIndex = lastSpeechSpeedIndex + 1;
+        applySpeed(nextIndex);
+        if (!hasStarted && !synth.speaking) {
+            return;
+        }
+        const wasPaused = synth.paused || isPaused;
+        const wasPlaying = synth.speaking && !synth.paused && !isPaused;
+        stopActiveSpeechPlayback();
+        hasStarted = false;
+        isPaused = false;
+        if (wasPlaying) {
+            startSpeech();
+        } else if (wasPaused) {
+            updatePlayLabel('▶ 重新播放');
+        } else {
+            updatePlayLabel('▶ 开始播放');
+        }
+    });
+
+    const initialIndex = Number.parseInt(speedBtn.dataset.speedIndex || String(lastSpeechSpeedIndex), 10);
+    const safeInitial = Number.isNaN(initialIndex) ? lastSpeechSpeedIndex : initialIndex;
+    applySpeed(safeInitial);
+    updatePlayLabel('▶ 开始播放');
 }
 
 function formatPlaybackRate(rate) {
@@ -504,6 +665,26 @@ function formatPlaybackRate(rate) {
     }
     const formatted = rate.toFixed(2);
     return formatted.endsWith('0') ? formatted.slice(0, -1) : formatted;
+}
+
+function detectSpeechLanguage(text) {
+    if (!text) {
+        return 'en-US';
+    }
+    const sample = text.slice(0, 200);
+    if (/[\u4e00-\u9fff]/.test(sample)) {
+        return 'zh-CN';
+    }
+    if (/[ぁ-んァ-ヶ]/.test(sample)) {
+        return 'ja-JP';
+    }
+    if (/[А-Яа-яЁё]/.test(sample)) {
+        return 'ru-RU';
+    }
+    if (/[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(sample)) {
+        return 'ko-KR';
+    }
+    return 'en-US';
 }
 
 function renderReadingSection(reading) {
