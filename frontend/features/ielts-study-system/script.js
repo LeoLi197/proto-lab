@@ -118,14 +118,62 @@ function uploadWithProgress(url, formData, onProgress) {
     });
 }
 
+function normaliseErrorDetail(value) {
+    if (value == null) {
+        return '';
+    }
+    if (typeof value === 'string') {
+        return value;
+    }
+    if (Array.isArray(value)) {
+        return value
+            .map((item) => normaliseErrorDetail(item))
+            .filter(Boolean)
+            .join('；');
+    }
+    if (typeof value === 'object') {
+        const preferredKeys = ['detail', 'message', 'msg', 'error'];
+        for (const key of preferredKeys) {
+            if (key in value) {
+                const result = normaliseErrorDetail(value[key]);
+                if (result) {
+                    return result;
+                }
+            }
+        }
+        const parts = Object.values(value)
+            .map((item) => normaliseErrorDetail(item))
+            .filter(Boolean);
+        if (parts.length > 0) {
+            return parts.join('；');
+        }
+        try {
+            return JSON.stringify(value);
+        } catch (err) {
+            return String(value);
+        }
+    }
+    return String(value);
+}
+
 function parseXHRError(xhr) {
     try {
         if (xhr.response && typeof xhr.response === 'object') {
-            return xhr.response.detail || xhr.response.message || '';
+            const message = normaliseErrorDetail(xhr.response.detail || xhr.response.message || xhr.response);
+            if (message) {
+                return message;
+            }
         }
         if (xhr.responseText) {
-            const parsed = JSON.parse(xhr.responseText);
-            return parsed.detail || parsed.message || xhr.responseText;
+            try {
+                const parsed = JSON.parse(xhr.responseText);
+                const message = normaliseErrorDetail(parsed.detail || parsed.message || parsed);
+                if (message) {
+                    return message;
+                }
+            } catch (err) {
+                return xhr.responseText;
+            }
         }
     } catch (err) {
         return xhr.responseText || '';
