@@ -127,7 +127,7 @@
                     <span id="conversationStatus" class="status-pill">等待生成</span>
                 </div>
                 <div id="conversationContent" class="module-content">
-                    <p class="placeholder">生成会话脚本后，可用浏览器语音合成朗读问题，配合录音练习口语输出。</p>
+                    <p class="placeholder">生成会话脚本后，AI 会逐题提问，你可以按住按钮回答并立即获得反馈。</p>
                 </div>
             </section>
         </main>
@@ -412,27 +412,171 @@
             padding: 12px;
             background: #fbfdff;
         }
-        .voice-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 12px 14px;
-            border-radius: 10px;
-            border: 1px solid #e2e8f0;
-            margin-bottom: 10px;
-            background: #fff;
+        .coach-wrapper {
+            margin-top: 12px;
+            padding: 16px;
+            border-radius: 14px;
+            border: 1px solid #d3def8;
+            background: linear-gradient(180deg, #fdfefe 0%, #f6faff 100%);
+            display: grid;
+            gap: 16px;
         }
-        .voice-row button {
-            padding: 6px 12px;
-            border-radius: 6px;
-            background: #3142c6;
-            color: #fff;
-            border: none;
+        .coach-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+        }
+        .coach-question-label {
+            font-size: 0.85rem;
+            color: #4a4f75;
+            font-weight: 600;
+        }
+        .coach-question-text {
+            flex: 1;
+            min-width: 220px;
+        }
+        .coach-question-main {
+            font-weight: 600;
+            line-height: 1.5;
+            color: #2f3d63;
+        }
+        .coach-question-text .hint {
+            margin-top: 6px;
+            font-size: 0.85rem;
+            color: #4a4f75;
+        }
+        .coach-repeat {
+            padding: 6px 14px;
+            border-radius: 999px;
+            border: 1px solid #c5d4ff;
+            background: #f1f4ff;
+            color: #3142c6;
+            font-weight: 600;
             cursor: pointer;
         }
-        .voice-row button:hover {
-            background: #202fb8;
+        .coach-repeat:hover {
+            background: #e4eaff;
+        }
+        .coach-body {
+            display: grid;
+            gap: 10px;
+        }
+        .coach-transcript {
+            min-height: 24px;
+            font-size: 0.95rem;
+            color: #2f3d63;
+        }
+        .coach-feedback {
+            min-height: 36px;
+        }
+        .coach-feedback-success {
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: #e8f8ef;
+            border: 1px solid #b6edc9;
+            color: #0f8d3a;
+        }
+        .coach-feedback-error {
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: #fff3f0;
+            border: 1px solid #ffd1c7;
+            color: #d93025;
+        }
+        .coach-reference {
+            margin-top: 8px;
+            font-size: 0.9rem;
+            color: #2f3d63;
+        }
+        .coach-reference mark {
+            background: #fff0b3;
+            border-radius: 4px;
+            padding: 0 4px;
+        }
+        .push-to-talk {
+            justify-self: flex-start;
+            padding: 10px 22px;
+            border-radius: 999px;
+            border: none;
+            background: linear-gradient(135deg, #3142c6, #5a6dff);
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s ease, box-shadow 0.2s ease;
+        }
+        .push-to-talk:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 18px rgba(49, 66, 198, 0.18);
+        }
+        .push-to-talk.recording {
+            background: linear-gradient(135deg, #d93025, #ff6b55);
+            box-shadow: 0 0 0 4px rgba(217, 48, 37, 0.18);
+        }
+        .push-to-talk:disabled {
+            background: #d6dcff;
+            color: #6b7bd6;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .manual-answer {
+            display: grid;
+            gap: 8px;
+        }
+        .manual-answer textarea {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid #cbd5f5;
+            padding: 8px 10px;
+            font-size: 0.95rem;
+            resize: vertical;
+        }
+        .coach-manual-submit {
+            justify-self: flex-start;
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: 1px solid #cdd9ff;
+            background: #f4f7ff;
+            color: #3142c6;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .coach-manual-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .coach-progress {
+            display: flex;
+            gap: 8px;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .coach-progress li {
+            flex: 1;
+            min-width: 48px;
+            text-align: center;
+            padding: 6px 0;
+            border-radius: 8px;
+            background: #eef2ff;
+            color: #4150c8;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+        .coach-progress li.complete {
+            background: #d7f5e0;
+            color: #0f8d3a;
+        }
+        .coach-progress li.active {
+            background: #3142c6;
+            color: #fff;
+        }
+        .coach-progress li span {
+            display: block;
+        }
+        .coach-closing {
+            min-height: 20px;
         }
         .evaluation-box {
             margin-top: 16px;

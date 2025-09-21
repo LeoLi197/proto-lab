@@ -60,7 +60,7 @@ class TTSSynthesizer:
         if not self.available or self._engine is None:
             return None, self._note
 
-        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
         tmp_file.close()
         try:
             with self._lock:
@@ -537,7 +537,7 @@ def _prepare_listening_payload(
     audio_b64, tts_note = TTS_SYNTHESIZER.synthesize(script)
     audio_plan = {
         "available": audio_b64 is not None,
-        "format": "audio/mp3" if audio_b64 else None,
+        "format": "audio/wav" if audio_b64 else None,
         "base64": audio_b64,
         "message": tts_note,
     }
@@ -618,6 +618,8 @@ def _prepare_conversation_payload(conversation_raw: Dict[str, object], story: Di
                 "question": item.get("question") or "",
                 "focus_words": item.get("focus_words") or [],
                 "follow_up": item.get("follow_up") or "",
+                "reference_answer": item.get("reference_answer") or "",
+                "answer_explanation": item.get("answer_explanation") or "",
             }
         )
     agenda = conversation_raw.get("agenda")
@@ -661,9 +663,9 @@ def _prepare_conversation_payload(conversation_raw: Dict[str, object], story: Di
     practice_tips = conversation_raw.get("practice_tips")
     if not isinstance(practice_tips, list) or not practice_tips:
         practice_tips = [
-            "使用浏览器 SpeechSynthesis API 可快速生成每个问题的语音播放。",
-            "结合 MediaRecorder 录音，完成后上传到语音批改服务。",
-            "回答时务必包含列表中的每个词汇，可在末尾自检是否覆盖。",
+            "点击或按住下方按钮即可开始语音回答，浏览器会自动转写文字。",
+            "如果识别不稳定，可在放开按钮后手动修改文本再提交。",
+            "确保回答覆盖提示中的重点词汇，并按照追问提示进一步展开。",
         ]
     conversation = {
         "role": conversation_raw.get("role")
@@ -704,7 +706,7 @@ def _build_materials_prompt(words: List[str], scenario_hint: Optional[str]) -> s
         "  },\n"
         "  \"conversation\": {\n"
         "    \"role\": str, \"opening_line\": str, \"closing_line\": str,\n"
-        "    \"questions\": [{\"id\": str, \"question\": str, \"focus_words\": [str], \"follow_up\": str}],\n"
+        "    \"questions\": [{\"id\": str, \"question\": str, \"focus_words\": [str], \"follow_up\": str, \"reference_answer\": str, \"answer_explanation\": str}],\n"
         "    \"agenda\": [{\"step\": int, \"goal\": str, \"actions\": [str]}],\n"
         "    \"voice_prompts\": [{\"order\": int, \"text\": str, \"focus_words\": [str]}],\n"
         "    \"practice_tips\": [str]\n"
