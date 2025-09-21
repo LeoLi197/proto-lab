@@ -661,11 +661,16 @@ def _public_session_payload(session: Dict[str, object]) -> Dict[str, object]:
 
 @router.post("/upload-batch")
 async def create_session(
-    files: List[UploadFile] | None = File(default=None),
+    files: UploadFile | List[UploadFile] | None = File(default=None),
     manual_words: Optional[str] = Form(default=None),
     scenario_hint: Optional[str] = Form(default=None),
 ) -> Dict[str, object]:
-    uploads = files or []
+    if files is None:
+        uploads: List[UploadFile] = []
+    elif isinstance(files, list):
+        uploads = files
+    else:
+        uploads = [files]
     manual_tokens = _parse_manual_words(manual_words)
 
     if not uploads and not manual_tokens:
