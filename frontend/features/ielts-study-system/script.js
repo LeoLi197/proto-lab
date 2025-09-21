@@ -5,6 +5,7 @@ checkAuth();
 
 let currentSessionId = null;
 let sessionPayload = null;
+let progressHideTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('uploadForm').addEventListener('submit', handleUploadSubmit);
@@ -17,10 +18,119 @@ function setStatus(elementId, text, state) {
     const pill = document.getElementById(elementId);
     if (!pill) return;
     pill.textContent = text;
-    pill.classList.remove('ready', 'waiting', 'error');
+    pill.classList.remove('ready', 'waiting', 'error', 'loading');
     if (state) {
         pill.classList.add(state);
     }
+}
+
+function setStatusFlag(text, state) {
+    const flag = document.getElementById('uploadStatusFlag');
+    if (!flag) return;
+    flag.textContent = text;
+    flag.classList.remove('loading', 'success', 'error');
+    if (state) {
+        flag.classList.add(state);
+    }
+}
+
+function toggleProgress(visible) {
+    const wrapper = document.getElementById('uploadProgressWrapper');
+    if (!wrapper) return;
+    if (visible) {
+        if (progressHideTimer) {
+            clearTimeout(progressHideTimer);
+            progressHideTimer = null;
+        }
+        wrapper.style.display = 'flex';
+    } else {
+        wrapper.style.display = 'none';
+        updateUploadProgress(0);
+        if (progressHideTimer) {
+            clearTimeout(progressHideTimer);
+            progressHideTimer = null;
+        }
+    }
+}
+
+function updateUploadProgress(value) {
+    const fill = document.getElementById('uploadProgressFill');
+    const text = document.getElementById('uploadProgressText');
+    if (!fill || !text) return;
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+        fill.style.width = '100%';
+        text.textContent = '···';
+        return;
+    }
+    const percentage = Math.max(0, Math.min(100, Math.round(value * 100)));
+    fill.style.width = `${percentage}%`;
+    text.textContent = `${percentage}%`;
+}
+
+function showUploadFeedback(message, type = 'info') {
+    const container = document.getElementById('uploadFeedback');
+    if (!container) return;
+    container.textContent = message || '';
+    container.classList.remove('error', 'success');
+    if (type === 'error') {
+        container.classList.add('error');
+    } else if (type === 'success') {
+        container.classList.add('success');
+    }
+}
+
+function uploadWithProgress(url, formData, onProgress) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.responseType = 'json';
+        xhr.upload.onprogress = (event) => {
+            if (typeof onProgress === 'function') {
+                if (event.lengthComputable) {
+                    onProgress(event.loaded / event.total);
+                } else {
+                    onProgress(null);
+                }
+            }
+        };
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                if (xhr.response && typeof xhr.response === 'object') {
+                    resolve(xhr.response);
+                } else if (xhr.responseText) {
+                    try {
+                        resolve(JSON.parse(xhr.responseText));
+                    } catch (err) {
+                        resolve({});
+                    }
+                } else {
+                    resolve({});
+                }
+            } else {
+                const message = parseXHRError(xhr) || '生成学习素材失败';
+                reject(new Error(message));
+            }
+        };
+        xhr.onerror = () => {
+            reject(new Error('网络异常，请稍后重试'));
+        };
+        xhr.send(formData);
+    });
+}
+
+function parseXHRError(xhr) {
+    try {
+        if (xhr.response && typeof xhr.response === 'object') {
+            return xhr.response.detail || xhr.response.message || '';
+        }
+        if (xhr.responseText) {
+            const parsed = JSON.parse(xhr.responseText);
+            return parsed.detail || parsed.message || xhr.responseText;
+        }
+    } catch (err) {
+        return xhr.responseText || '';
+    }
+    return '';
 }
 
 function parseManualWords(text) {
@@ -38,6 +148,13 @@ async function handleUploadSubmit(event) {
     button.textContent = '生成中...';
     summaryBox.style.display = 'block';
     summaryBox.innerHTML = '<p>正在解析图片并构建学习材料，请稍候...</p>';
+    setStatusFlag('上传中', 'loading');
+    setStatus('listeningStatus', '生成中', 'loading');
+    setStatus('readingStatus', '生成中', 'loading');
+    setStatus('conversationStatus', '生成中', 'loading');
+    toggleProgress(true);
+    updateUploadProgress(0);
+    showUploadFeedback('正在上传文件并调用 Gemini 解析...', 'info');
 
     try {
         const formData = new FormData();
@@ -62,28 +179,32 @@ async function handleUploadSubmit(event) {
             usageTracker.track({ feature: 'ielts-study-system', action: 'upload-start' });
         }
 
-        const response = await fetch('/api/ielts/upload-batch', {
-            method: 'POST',
-            body: formData,
+        const data = await uploadWithProgress('/api/ielts/upload-batch', formData, (progress) => {
+            if (progress === null) {
+                showUploadFeedback('正在上传文件...', 'info');
+                updateUploadProgress(NaN);
+            } else {
+                updateUploadProgress(progress);
+                if (progress >= 1) {
+                    showUploadFeedback('上传完成，正在生成学习材料...', 'info');
+                }
+            }
         });
-
-        if (!response.ok) {
-            const message = await safeRead(response);
-            throw new Error(message || '生成学习素材失败');
-        }
-
-        const data = await response.json();
         if (window.usageTracker) {
             usageTracker.track({ feature: 'ielts-study-system', action: 'upload-success' });
         }
         renderSession(data);
     } catch (error) {
+        const message = error && error.message ? error.message : '生成学习素材失败';
         setStatus('listeningStatus', '等待生成', 'waiting');
         setStatus('readingStatus', '等待生成', 'waiting');
         setStatus('conversationStatus', '等待生成', 'waiting');
-        summaryBox.innerHTML = `<p class="error">${error.message}</p>`;
+        setStatusFlag('上传失败', 'error');
+        showUploadFeedback(message, 'error');
+        toggleProgress(false);
+        summaryBox.innerHTML = `<p class="error">${message}</p>`;
         if (window.usageTracker) {
-            usageTracker.track({ feature: 'ielts-study-system', action: 'upload-error', detail: error.message });
+            usageTracker.track({ feature: 'ielts-study-system', action: 'upload-error', detail: message });
         }
     } finally {
         button.disabled = false;
@@ -103,6 +224,16 @@ async function safeRead(response) {
 function renderSession(data) {
     currentSessionId = data.session_id;
     sessionPayload = data;
+    setStatusFlag('上传成功', 'success');
+    updateUploadProgress(1);
+    showUploadFeedback('上传成功，学习材料已生成 ✅', 'success');
+    if (progressHideTimer) {
+        clearTimeout(progressHideTimer);
+    }
+    progressHideTimer = setTimeout(() => {
+        toggleProgress(false);
+        progressHideTimer = null;
+    }, 600);
     renderUploadSummary(data);
     renderListeningSection(data.listening);
     renderReadingSection(data.reading);
