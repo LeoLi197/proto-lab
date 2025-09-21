@@ -6,7 +6,6 @@ import io
 import json
 import os
 import re
-import tempfile
 import uuid
 from collections import OrderedDict
 from copy import deepcopy
@@ -19,11 +18,6 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from PIL import Image, UnidentifiedImageError
 
-try:  # Optional offline TTS dependency
-    import pyttsx3
-except Exception:  # pragma: no cover - dependency is optional at runtime
-    pyttsx3 = None  # type: ignore[assignment]
-
 
 router = APIRouter(prefix="/ielts", tags=["IELTS Study System"])
 
@@ -33,52 +27,50 @@ class OCRUnavailableError(Exception):
 
 
 class TTSSynthesizer:
-    """Lightweight wrapper around pyttsx3 with graceful degradation."""
+    """Gemini powered Text-To-Speech helper."""
 
     def __init__(self) -> None:
-        self._engine = None
         self._lock = Lock()
-        self.available = False
-        if pyttsx3 is None:  # Library not installed
-            self._note = "pyttsx3 未安装，已回退为文本脚本。"
-            return
-        try:
-            engine = pyttsx3.init()  # type: ignore[call-arg]
-            engine.setProperty("rate", 158)
-            engine.setProperty("volume", 0.92)
-            self._engine = engine
-            self.available = True
-            self._note = "音频由 pyttsx3 生成。"
-        except Exception as exc:  # pragma: no cover - depends on system voices
-            self._engine = None
-            self.available = False
-            self._note = f"TTS 引擎初始化失败：{exc}."
+        self._voice_name = os.environ.get("IELTS_TTS_VOICE", "aoede")
+        self._mime_type = os.environ.get("IELTS_TTS_MIME_TYPE", "audio/mp3")
+        self._model = (
+            os.environ.get("IELTS_TTS_MODEL")
+            or os.environ.get("IELTS_GEMINI_MODEL")
+            or "gemini-1.5-flash"
+        )
+        self.available = bool(os.environ.get("GEMINI_API_KEY"))
+        self._success_note = "音频由 Gemini TTS 生成。"
 
     def synthesize(self, text: str) -> Tuple[Optional[str], str]:
-        """Convert text into base64 encoded audio if the engine is available."""
+        """Convert text into base64 encoded audio via Gemini."""
 
-        if not self.available or self._engine is None:
-            return None, self._note
+        cleaned = text.strip()
+        if not cleaned:
+            return None, "听力脚本为空，已回退为文本内容。"
+        if not self.available:
+            return None, "服务器未配置 GEMINI_API_KEY，暂时无法生成音频。"
 
-        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-        tmp_file.close()
         try:
             with self._lock:
-                self._engine.save_to_file(text, tmp_file.name)
-                self._engine.runAndWait()
-            with open(tmp_file.name, "rb") as handle:
-                audio_bytes = handle.read()
-            encoded = base64.b64encode(audio_bytes).decode("utf-8")
-            return encoded, self._note
-        except Exception as exc:  # pragma: no cover - depends on runtime env
-            message = f"TTS 生成失败：{exc}."
-            return None, message
-        finally:
-            if os.path.exists(tmp_file.name):
-                try:
-                    os.remove(tmp_file.name)
-                except OSError:
-                    pass
+                audio_b64 = _call_gemini_tts(
+                    cleaned,
+                    model=self._model,
+                    mime_type=self._mime_type,
+                    voice_name=self._voice_name,
+                )
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+            return None, f"Gemini TTS 调用失败：{detail}"
+        except Exception as exc:  # pragma: no cover - defensive
+            return None, f"Gemini TTS 生成异常：{exc}"
+
+        if audio_b64:
+            return audio_b64, self._success_note
+        return None, "Gemini TTS 未返回音频，已提供文本脚本。"
+
+    @property
+    def mime_type(self) -> str:
+        return self._mime_type
 
 
 class SessionManager:
@@ -167,6 +159,63 @@ def _get_gemini_api_key() -> str:
     if not api_key:
         raise HTTPException(status_code=500, detail="服务器未配置 GEMINI_API_KEY，请先设置环境变量后重试。")
     return api_key
+
+
+def _call_gemini_tts(
+    text: str,
+    *,
+    model: Optional[str] = None,
+    mime_type: str = "audio/mp3",
+    voice_name: Optional[str] = None,
+    timeout: int = 120,
+) -> Optional[str]:
+    api_key = _get_gemini_api_key()
+    resolved_model = model or os.environ.get("IELTS_TTS_MODEL") or DEFAULT_GEMINI_MODEL
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/{resolved_model}:generateContent?key={api_key}"
+    )
+    payload: Dict[str, object] = {
+        "contents": [{"role": "user", "parts": [{"text": text}]}],
+        "generationConfig": {
+            "temperature": 0.25,
+            "topP": 0.9,
+            "topK": 32,
+            "maxOutputTokens": 1200,
+            "responseMimeType": mime_type,
+        },
+        "safetySettings": _GEMINI_SAFETY_SETTINGS,
+    }
+    if voice_name:
+        payload["audioConfig"] = {"voiceConfig": {"voiceName": voice_name}}
+
+    try:
+        response = requests.post(url, json=payload, timeout=timeout)
+    except requests.RequestException as exc:  # pragma: no cover - network failure
+        raise HTTPException(status_code=502, detail=f"调用 Gemini TTS 失败：{exc}") from exc
+
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail=f"Gemini TTS error: {response.text}")
+
+    result = response.json()
+    candidates = result.get("candidates") or []
+    for candidate in candidates:
+        content = candidate.get("content") or {}
+        parts = content.get("parts") or []
+        for part in parts:
+            inline = part.get("inline_data") or part.get("inlineData")
+            if inline and inline.get("data"):
+                return str(inline["data"])
+            audio = part.get("audio")
+            if audio and audio.get("data"):
+                return str(audio["data"])
+    finish_reasons = [
+        candidate.get("finishReason")
+        for candidate in candidates
+        if candidate.get("finishReason")
+    ]
+    if finish_reasons and any(reason == "SAFETY" for reason in finish_reasons):
+        raise HTTPException(status_code=400, detail="Gemini TTS 输出被安全策略拦截。")
+    return None
 
 
 def _call_gemini_sync(prompt: str, images: Optional[List[str]] = None, response_mime_type: str = "application/json") -> str:
@@ -537,7 +586,7 @@ def _prepare_listening_payload(
     audio_b64, tts_note = TTS_SYNTHESIZER.synthesize(script)
     audio_plan = {
         "available": audio_b64 is not None,
-        "format": "audio/wav" if audio_b64 else None,
+        "format": TTS_SYNTHESIZER.mime_type if audio_b64 else None,
         "base64": audio_b64,
         "message": tts_note,
     }
