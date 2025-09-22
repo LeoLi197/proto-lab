@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import io
 import json
 import os
@@ -11,6 +12,7 @@ from collections import OrderedDict
 from copy import deepcopy
 from threading import Lock
 from typing import Dict, Iterable, List, Optional, Tuple
+import wave
 
 import requests
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -32,7 +34,8 @@ class TTSSynthesizer:
     def __init__(self) -> None:
         self._lock = Lock()
         self._voice_name = os.environ.get("IELTS_TTS_VOICE", "aoede")
-        self._mime_type = os.environ.get("IELTS_TTS_MIME_TYPE", "audio/mp3")
+        self._request_mime_type = os.environ.get("IELTS_TTS_MIME_TYPE", "audio/pcm")
+        self._mime_type = self._request_mime_type
         self._model = (
             os.environ.get("IELTS_TTS_MODEL")
             or os.environ.get("IELTS_GEMINI_MODEL")
@@ -52,10 +55,10 @@ class TTSSynthesizer:
 
         try:
             with self._lock:
-                audio_b64 = _call_gemini_tts(
+                audio_b64, resolved_mime = _call_gemini_tts(
                     cleaned,
                     model=self._model,
-                    mime_type=self._mime_type,
+                    mime_type=self._request_mime_type,
                     voice_name=self._voice_name,
                 )
         except HTTPException as exc:
@@ -65,6 +68,10 @@ class TTSSynthesizer:
             return None, f"Gemini TTS 生成异常：{exc}"
 
         if audio_b64:
+            if resolved_mime:
+                self._mime_type = resolved_mime
+            else:
+                self._mime_type = "audio/wav"
             return audio_b64, self._success_note
         return None, "Gemini TTS 未返回音频，已提供文本脚本。"
 
@@ -100,6 +107,218 @@ _GEMINI_SAFETY_SETTINGS = [
     {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
 ]
+
+_DEFAULT_PCM_SAMPLE_RATE = 24000
+_DEFAULT_PCM_CHANNELS = 1
+_DEFAULT_PCM_SAMPLE_WIDTH = 2
+_PCM_MIME_HINTS = {
+    "audio/pcm",
+    "audio/x-raw",
+    "audio/raw",
+    "audio/basic",
+    "audio/l16",
+    "linear16",
+}
+_WAV_MIME_ALIASES = {"audio/wave", "audio/x-wav"}
+_MP3_MIME_ALIASES = {"audio/mp3"}
+_AUDIO_RATE_KEYS = [
+    "sampleRateHz",
+    "sampleRateHertz",
+    "sample_rate_hz",
+    "sample_rate",
+    "sample_rate_hertz",
+    "samplesPerSecond",
+    "samples_per_second",
+    "samplingRate",
+    "sampling_rate",
+    "sampling_rate_hz",
+]
+_AUDIO_CHANNEL_KEYS = [
+    "channels",
+    "channelCount",
+    "channelsCount",
+    "numChannels",
+    "channel_count",
+]
+_AUDIO_WIDTH_KEYS = [
+    "bitsPerSample",
+    "bits_per_sample",
+    "bitDepth",
+    "sampleWidth",
+    "sample_width",
+    "bytesPerSample",
+    "bytes_per_sample",
+]
+
+
+def _normalise_mime_hint(mime_hint: Optional[str]) -> Optional[str]:
+    if not mime_hint:
+        return None
+    value = str(mime_hint).strip()
+    if not value:
+        return None
+    base = value.split(";", 1)[0].strip().lower()
+    if base == "audio/wav" or base in _WAV_MIME_ALIASES:
+        return "audio/wav"
+    if base == "audio/mpeg" or base in _MP3_MIME_ALIASES:
+        return "audio/mpeg"
+    if base in _PCM_MIME_HINTS:
+        return "audio/pcm"
+    return base
+
+
+def _iter_audio_metadata_dicts(source: Optional[Dict[str, object]]):
+    if not isinstance(source, dict):
+        return
+    queue: List[Dict[str, object]] = [source]
+    seen: set[int] = set()
+    while queue:
+        current = queue.pop(0)
+        identifier = id(current)
+        if identifier in seen:
+            continue
+        seen.add(identifier)
+        yield current
+        for key in ("audioFormat", "audio_format", "config", "audioConfig", "format", "metadata"):
+            nested = current.get(key)
+            if isinstance(nested, dict):
+                queue.append(nested)
+
+
+def _resolve_audio_parameters(
+    mime_hint: Optional[str], metadata: Optional[Dict[str, object]]
+) -> Tuple[int, int, int]:
+    sample_rate = _DEFAULT_PCM_SAMPLE_RATE
+    channels = _DEFAULT_PCM_CHANNELS
+    sample_width = _DEFAULT_PCM_SAMPLE_WIDTH
+
+    if mime_hint:
+        for token in str(mime_hint).split(";"):
+            candidate = token.strip()
+            if not candidate or "=" not in candidate:
+                continue
+            key, value = candidate.split("=", 1)
+            key = key.strip().lower()
+            value = value.strip()
+            try:
+                parsed = int(value)
+            except (TypeError, ValueError):
+                continue
+            if parsed <= 0:
+                continue
+            if key in {"rate", "samplerate", "sample_rate"}:
+                sample_rate = parsed
+            elif key in {"channels", "channel"}:
+                channels = max(1, parsed)
+            elif key in {"width", "samplewidth", "bytes_per_sample"}:
+                sample_width = max(1, parsed)
+
+    rate_found = False
+    channel_found = False
+    width_found = False
+    for candidate in _iter_audio_metadata_dicts(metadata):
+        if not rate_found:
+            for key in _AUDIO_RATE_KEYS:
+                if key in candidate:
+                    try:
+                        rate_value = int(candidate[key])
+                    except (TypeError, ValueError):
+                        continue
+                    if rate_value > 0:
+                        sample_rate = rate_value
+                        rate_found = True
+                        break
+        if not channel_found:
+            for key in _AUDIO_CHANNEL_KEYS:
+                if key in candidate:
+                    try:
+                        channel_value = int(candidate[key])
+                    except (TypeError, ValueError):
+                        continue
+                    if channel_value > 0:
+                        channels = max(1, channel_value)
+                        channel_found = True
+                        break
+        if not width_found:
+            for key in _AUDIO_WIDTH_KEYS:
+                if key in candidate:
+                    try:
+                        width_value = int(candidate[key])
+                    except (TypeError, ValueError):
+                        continue
+                    if width_value <= 0:
+                        continue
+                    if "bit" in key.lower():
+                        sample_width = max(1, width_value // 8 or 1)
+                    else:
+                        sample_width = max(1, width_value)
+                    width_found = True
+                    break
+        if rate_found and channel_found and width_found:
+            break
+
+    return sample_rate, channels, sample_width
+
+
+def _pcm_to_wav_bytes(
+    pcm_bytes: bytes,
+    *,
+    sample_rate: int,
+    channels: int,
+    sample_width: int,
+) -> bytes:
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav_file:
+        wav_file.setnchannels(max(1, channels))
+        wav_file.setsampwidth(max(1, sample_width))
+        wav_file.setframerate(max(1, sample_rate))
+        wav_file.writeframes(pcm_bytes)
+    return buffer.getvalue()
+
+
+def _ensure_base64_text(value: object) -> str:
+    if isinstance(value, (bytes, bytearray)):
+        try:
+            return value.decode("utf-8")
+        except UnicodeDecodeError:
+            return base64.b64encode(value).decode("utf-8")
+    return str(value)
+
+
+def _normalise_audio_payload(
+    raw_data: object,
+    raw_mime_type: Optional[str],
+    requested_mime_type: Optional[str],
+    metadata: Optional[Dict[str, object]] = None,
+) -> Tuple[str, str]:
+    base64_text = _ensure_base64_text(raw_data)
+    normalised_raw = _normalise_mime_hint(raw_mime_type)
+    normalised_requested = _normalise_mime_hint(requested_mime_type)
+    resolved_hint = normalised_raw or normalised_requested
+
+    if resolved_hint in _PCM_MIME_HINTS or (resolved_hint and "pcm" in resolved_hint):
+        sample_rate, channels, sample_width = _resolve_audio_parameters(raw_mime_type, metadata)
+        try:
+            pcm_bytes = base64.b64decode(base64_text)
+        except (binascii.Error, ValueError):
+            return base64_text, normalised_requested or "audio/pcm"
+        wav_bytes = _pcm_to_wav_bytes(
+            pcm_bytes,
+            sample_rate=sample_rate,
+            channels=channels,
+            sample_width=sample_width,
+        )
+        wav_b64 = base64.b64encode(wav_bytes).decode("utf-8")
+        return wav_b64, "audio/wav"
+
+    if resolved_hint == "audio/wav":
+        return base64_text, "audio/wav"
+    if resolved_hint == "audio/mpeg":
+        return base64_text, "audio/mpeg"
+    if resolved_hint:
+        return base64_text, resolved_hint
+
+    return base64_text, normalised_requested or "audio/wav"
 
 
 class AnswerItem(BaseModel):
@@ -165,10 +384,10 @@ def _call_gemini_tts(
     text: str,
     *,
     model: Optional[str] = None,
-    mime_type: str = "audio/mp3",
+    mime_type: Optional[str] = "audio/pcm",
     voice_name: Optional[str] = None,
     timeout: int = 120,
-) -> Optional[str]:
+) -> Tuple[Optional[str], Optional[str]]:
     api_key = _get_gemini_api_key()
     resolved_model = model or os.environ.get("IELTS_TTS_MODEL") or DEFAULT_GEMINI_MODEL
     url = (
@@ -181,12 +400,16 @@ def _call_gemini_tts(
             "topP": 0.9,
             "topK": 32,
             "maxOutputTokens": 1200,
-            "responseMimeType": mime_type,
+            "responseModalities": ["AUDIO"],
         },
         "safetySettings": _GEMINI_SAFETY_SETTINGS,
     }
+    if mime_type:
+        payload["generationConfig"]["responseMimeType"] = mime_type
     if voice_name:
-        payload["audioConfig"] = {"voiceConfig": {"voiceName": voice_name}}
+        payload["speechConfig"] = {
+            "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice_name}}
+        }
 
     try:
         response = requests.post(url, json=payload, timeout=timeout)
@@ -203,11 +426,23 @@ def _call_gemini_tts(
         parts = content.get("parts") or []
         for part in parts:
             inline = part.get("inline_data") or part.get("inlineData")
-            if inline and inline.get("data"):
-                return str(inline["data"])
+            if isinstance(inline, dict) and inline.get("data"):
+                data, resolved_mime = _normalise_audio_payload(
+                    inline.get("data"),
+                    inline.get("mime_type") or inline.get("mimeType"),
+                    mime_type,
+                    inline,
+                )
+                return data, resolved_mime
             audio = part.get("audio")
-            if audio and audio.get("data"):
-                return str(audio["data"])
+            if isinstance(audio, dict) and audio.get("data"):
+                data, resolved_mime = _normalise_audio_payload(
+                    audio.get("data"),
+                    audio.get("mime_type") or audio.get("mimeType"),
+                    mime_type,
+                    audio,
+                )
+                return data, resolved_mime
     finish_reasons = [
         candidate.get("finishReason")
         for candidate in candidates
@@ -215,7 +450,7 @@ def _call_gemini_tts(
     ]
     if finish_reasons and any(reason == "SAFETY" for reason in finish_reasons):
         raise HTTPException(status_code=400, detail="Gemini TTS 输出被安全策略拦截。")
-    return None
+    return None, None
 
 
 def _call_gemini_sync(prompt: str, images: Optional[List[str]] = None, response_mime_type: str = "application/json") -> str:
