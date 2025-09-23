@@ -15,7 +15,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import wave
 
 import requests
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from PIL import Image, UnidentifiedImageError
@@ -41,17 +41,17 @@ class TTSSynthesizer:
             or os.environ.get("IELTS_GEMINI_MODEL")
             or "gemini-1.5-flash"
         )
-        self.available = bool(os.environ.get("GEMINI_API_KEY"))
         self._success_note = "音频由 Gemini TTS 生成。"
 
-    def synthesize(self, text: str) -> Tuple[Optional[str], str]:
+    def synthesize(self, text: str, *, api_key: Optional[str] = None) -> Tuple[Optional[str], str]:
         """Convert text into base64 encoded audio via Gemini."""
 
         cleaned = text.strip()
         if not cleaned:
             return None, "听力脚本为空，已回退为文本内容。"
-        if not self.available:
-            return None, "服务器未配置 GEMINI_API_KEY，暂时无法生成音频。"
+        resolved_api_key = _get_gemini_api_key(api_key, required=False)
+        if not resolved_api_key:
+            return None, "未提供 Gemini API Key，暂时无法生成音频。"
 
         try:
             with self._lock:
@@ -60,6 +60,7 @@ class TTSSynthesizer:
                     model=self._model,
                     mime_type=self._request_mime_type,
                     voice_name=self._voice_name,
+                    api_key=resolved_api_key,
                 )
         except HTTPException as exc:
             detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
@@ -373,11 +374,20 @@ def _prepare_word_list(tokens: Iterable[str]) -> Tuple[List[str], List[str], Lis
     return list(ordered.keys()), duplicates, rejected
 
 
-def _get_gemini_api_key() -> str:
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="服务器未配置 GEMINI_API_KEY，请先设置环境变量后重试。")
-    return api_key
+def _get_gemini_api_key(
+    provided: Optional[str] = None, *, required: bool = True
+) -> Optional[str]:
+    candidate = str(provided).strip() if provided else ""
+    if candidate:
+        return candidate
+    env_api_key = os.environ.get("GEMINI_API_KEY")
+    if env_api_key:
+        cleaned = str(env_api_key).strip()
+        if cleaned:
+            return cleaned
+    if required:
+        raise HTTPException(status_code=400, detail="请先提供有效的 Gemini API Key。")
+    return None
 
 
 def _call_gemini_tts(
@@ -386,12 +396,13 @@ def _call_gemini_tts(
     model: Optional[str] = None,
     mime_type: Optional[str] = "audio/pcm",
     voice_name: Optional[str] = None,
+    api_key: Optional[str] = None,
     timeout: int = 120,
 ) -> Tuple[Optional[str], Optional[str]]:
-    api_key = _get_gemini_api_key()
+    resolved_api_key = _get_gemini_api_key(api_key)
     resolved_model = model or os.environ.get("IELTS_TTS_MODEL") or DEFAULT_GEMINI_MODEL
     url = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/{resolved_model}:generateContent?key={api_key}"
+        f"https://generativelanguage.googleapis.com/v1beta/models/{resolved_model}:generateContent?key={resolved_api_key}"
     )
     payload: Dict[str, object] = {
         "contents": [{"role": "user", "parts": [{"text": text}]}],
@@ -453,10 +464,15 @@ def _call_gemini_tts(
     return None, None
 
 
-def _call_gemini_sync(prompt: str, images: Optional[List[str]] = None, response_mime_type: str = "application/json") -> str:
-    api_key = _get_gemini_api_key()
+def _call_gemini_sync(
+    prompt: str,
+    images: Optional[List[str]] = None,
+    response_mime_type: str = "application/json",
+    api_key: Optional[str] = None,
+) -> str:
+    resolved_api_key = _get_gemini_api_key(api_key)
     model = os.environ.get("IELTS_GEMINI_MODEL", DEFAULT_GEMINI_MODEL)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={resolved_api_key}"
     parts = [{"text": prompt}]
     for image_b64 in images or []:
         parts.append({"inline_data": {"mime_type": "image/png", "data": image_b64}})
@@ -622,7 +638,9 @@ def _parse_gemini_json(raw: str) -> object:
     raise ValueError(f"模型返回的内容无法解析为 JSON：{snippet}")
 
 
-async def _perform_ocr_via_gemini(image: Image.Image, filename: str) -> Tuple[List[str], Optional[str]]:
+async def _perform_ocr_via_gemini(
+    image: Image.Image, filename: str, api_key: str
+) -> Tuple[List[str], Optional[str]]:
     encoded = _encode_image(image)
     prompt = (
         "你是一名 OCR 助手，请识别上传的学习单词图片。\n"
@@ -633,7 +651,7 @@ async def _perform_ocr_via_gemini(image: Image.Image, filename: str) -> Tuple[Li
         f"当前图片文件名：{filename}。\n"
         "请直接输出 JSON，勿添加额外文本。"
     )
-    raw = await run_in_threadpool(_call_gemini_sync, prompt, [encoded], "application/json")
+    raw = await run_in_threadpool(_call_gemini_sync, prompt, [encoded], "application/json", api_key)
     try:
         payload = _parse_gemini_json(raw)
     except ValueError as exc:
@@ -652,7 +670,7 @@ async def _perform_ocr_via_gemini(image: Image.Image, filename: str) -> Tuple[Li
     return words, note_text
 
 
-async def _extract_words_from_uploads(files: List[UploadFile]) -> Tuple[List[str], List[str]]:
+async def _extract_words_from_uploads(files: List[UploadFile], api_key: str) -> Tuple[List[str], List[str]]:
     extracted: List[str] = []
     notes: List[str] = []
     for upload in files:
@@ -670,7 +688,9 @@ async def _extract_words_from_uploads(files: List[UploadFile]) -> Tuple[List[str
             notes.append(f"{upload.filename} 不是有效的图片格式，已忽略。")
             continue
         try:
-            words, note = await _perform_ocr_via_gemini(image, upload.filename or "uploaded image")
+            words, note = await _perform_ocr_via_gemini(
+                image, upload.filename or "uploaded image", api_key
+            )
         except OCRUnavailableError as exc:
             notes.append(str(exc))
             continue
@@ -785,7 +805,10 @@ def _prepare_story_payload(raw_story: Dict[str, object], words: List[str]) -> Di
 
 
 def _prepare_listening_payload(
-    listening_raw: Dict[str, object], story: Dict[str, object], words: List[str]
+    listening_raw: Dict[str, object],
+    story: Dict[str, object],
+    words: List[str],
+    api_key: str,
 ) -> Tuple[Dict[str, object], Dict[str, Dict[str, object]]]:
     script = str(listening_raw.get("script") or " ".join(story.get("paragraphs", [])))
     segments_raw = listening_raw.get("segments") or []
@@ -818,7 +841,7 @@ def _prepare_listening_payload(
 
     questions_raw = listening_raw.get("questions") or []
     questions, answers = _split_questions_and_answers(questions_raw)
-    audio_b64, tts_note = TTS_SYNTHESIZER.synthesize(script)
+    audio_b64, tts_note = TTS_SYNTHESIZER.synthesize(script, api_key=api_key)
     audio_plan = {
         "available": audio_b64 is not None,
         "format": TTS_SYNTHESIZER.mime_type if audio_b64 else None,
@@ -1008,9 +1031,11 @@ def _build_materials_prompt(words: List[str], scenario_hint: Optional[str]) -> s
     )
 
 
-async def _generate_materials_via_gemini(words: List[str], scenario_hint: Optional[str]) -> Dict[str, object]:
+async def _generate_materials_via_gemini(
+    words: List[str], scenario_hint: Optional[str], api_key: str
+) -> Dict[str, object]:
     prompt = _build_materials_prompt(words, scenario_hint)
-    raw = await run_in_threadpool(_call_gemini_sync, prompt, None, "application/json")
+    raw = await run_in_threadpool(_call_gemini_sync, prompt, None, "application/json", api_key)
     try:
         payload = _parse_gemini_json(raw)
     except ValueError as exc:
@@ -1071,9 +1096,11 @@ def _public_session_payload(session: Dict[str, object]) -> Dict[str, object]:
 
 @router.post("/upload-batch")
 async def create_session(
+    request: Request,
     files: UploadFile | List[UploadFile] | None = File(default=None),
     manual_words: Optional[str] = Form(default=None),
     scenario_hint: Optional[str] = Form(default=None),
+    gemini_api_key: Optional[str] = Form(default=None),
 ) -> Dict[str, object]:
     if files is None:
         uploads: List[UploadFile] = []
@@ -1086,7 +1113,10 @@ async def create_session(
     if not uploads and not manual_tokens:
         raise HTTPException(status_code=400, detail="请至少上传一张图片或输入词汇列表。")
 
-    extracted_tokens, extraction_notes = await _extract_words_from_uploads(uploads)
+    header_api_key = request.headers.get("X-Gemini-Api-Key")
+    resolved_api_key = _get_gemini_api_key(gemini_api_key or header_api_key)
+
+    extracted_tokens, extraction_notes = await _extract_words_from_uploads(uploads, resolved_api_key)
     combined_tokens = extracted_tokens + manual_tokens
     words, duplicates, rejected = _prepare_word_list(combined_tokens)
 
@@ -1096,10 +1126,10 @@ async def create_session(
             detail += " " + "；".join(extraction_notes)
         raise HTTPException(status_code=400, detail=detail)
 
-    materials = await _generate_materials_via_gemini(words, scenario_hint)
+    materials = await _generate_materials_via_gemini(words, scenario_hint, resolved_api_key)
     story_payload = _prepare_story_payload(materials.get("story") or {}, words)
     listening_payload, listening_answers = _prepare_listening_payload(
-        materials.get("listening") or {}, story_payload, words
+        materials.get("listening") or {}, story_payload, words, resolved_api_key
     )
     reading_payload, reading_answers = _prepare_reading_payload(
         materials.get("reading") or {}, story_payload, words

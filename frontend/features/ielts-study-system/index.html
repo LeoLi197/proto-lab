@@ -89,6 +89,17 @@
                         <label for="scenarioHint">情景提示（选填）</label>
                         <input type="text" id="scenarioHint" placeholder="例如：校园迎新、研究所参观、职业规划会">
                     </div>
+                    <div class="form-group form-group-full">
+                        <label for="geminiApiKey">Gemini API Key</label>
+                        <div class="api-key-control">
+                            <input type="password" id="geminiApiKey" placeholder="请输入 Gemini API Key" autocomplete="off" spellcheck="false">
+                            <label class="remember-key" for="rememberGeminiKey">
+                                <input type="checkbox" id="rememberGeminiKey">
+                                <span>在本地保存，下次自动填写</span>
+                            </label>
+                        </div>
+                        <small class="form-tip">仅保存在浏览器本地，用于调用 Gemini 生成学习素材。</small>
+                    </div>
                     <div class="progress-wrapper" id="uploadProgressWrapper" style="display:none;">
                         <div class="progress-bar"><span id="uploadProgressFill"></span></div>
                         <span id="uploadProgressText">0%</span>
@@ -533,6 +544,29 @@
             background: #fff0b3;
             border-radius: 4px;
             padding: 0 4px;
+        }
+        .api-key-control {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+        .api-key-control input[type='password'] {
+            flex: 1;
+            min-width: 220px;
+        }
+        .remember-key {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.9rem;
+            color: #4a4f75;
+            cursor: pointer;
+            user-select: none;
+        }
+        .remember-key input {
+            width: 16px;
+            height: 16px;
         }
         .push-to-talk {
             justify-self: flex-start;

@@ -19,8 +19,105 @@ const SPEECH_SYNTHESIS_SUPPORTED =
     'SpeechSynthesisUtterance' in window;
 let lastSpeechSpeedIndex = DEFAULT_SPEED_INDEX;
 
+const GEMINI_KEY_STORAGE_KEY = 'ieltsStudyGeminiApiKey';
+const GEMINI_REMEMBER_STORAGE_KEY = 'ieltsStudyRememberGeminiKey';
+
+function readFromLocalStorage(key) {
+    try {
+        if (typeof window === 'undefined' || !window.localStorage) {
+            return null;
+        }
+        return window.localStorage.getItem(key);
+    } catch (err) {
+        return null;
+    }
+}
+
+function writeToLocalStorage(key, value) {
+    try {
+        if (typeof window === 'undefined' || !window.localStorage) {
+            return;
+        }
+        window.localStorage.setItem(key, value);
+    } catch (err) {
+        return;
+    }
+}
+
+function removeFromLocalStorage(key) {
+    try {
+        if (typeof window === 'undefined' || !window.localStorage) {
+            return;
+        }
+        window.localStorage.removeItem(key);
+    } catch (err) {
+        return;
+    }
+}
+
+function getStoredGeminiKey() {
+    const value = readFromLocalStorage(GEMINI_KEY_STORAGE_KEY);
+    return value || '';
+}
+
+function shouldRememberGeminiKey() {
+    return readFromLocalStorage(GEMINI_REMEMBER_STORAGE_KEY) === 'true';
+}
+
+function persistGeminiKey(value) {
+    const trimmed = typeof value === 'string' ? value.trim() : '';
+    if (trimmed) {
+        writeToLocalStorage(GEMINI_KEY_STORAGE_KEY, trimmed);
+    } else {
+        removeFromLocalStorage(GEMINI_KEY_STORAGE_KEY);
+    }
+}
+
+function persistRememberPreference(remember) {
+    writeToLocalStorage(GEMINI_REMEMBER_STORAGE_KEY, remember ? 'true' : 'false');
+    if (!remember) {
+        removeFromLocalStorage(GEMINI_KEY_STORAGE_KEY);
+    }
+}
+
+function initialiseGeminiKeyControls() {
+    const apiInput = document.getElementById('geminiApiKey');
+    const rememberCheckbox = document.getElementById('rememberGeminiKey');
+    if (!apiInput || !rememberCheckbox) {
+        return;
+    }
+
+    const storedKey = getStoredGeminiKey();
+    let rememberPreference = shouldRememberGeminiKey();
+    if (storedKey && !rememberPreference) {
+        rememberPreference = true;
+        writeToLocalStorage(GEMINI_REMEMBER_STORAGE_KEY, 'true');
+    }
+
+    rememberCheckbox.checked = rememberPreference;
+    if (rememberPreference && storedKey) {
+        apiInput.value = storedKey;
+    }
+
+    rememberCheckbox.addEventListener('change', () => {
+        const shouldRemember = rememberCheckbox.checked;
+        persistRememberPreference(shouldRemember);
+        if (shouldRemember && apiInput.value.trim()) {
+            persistGeminiKey(apiInput.value);
+        }
+    });
+
+    apiInput.addEventListener('input', () => {
+        if (!rememberCheckbox.checked) {
+            return;
+        }
+        persistGeminiKey(apiInput.value);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('uploadForm').addEventListener('submit', handleUploadSubmit);
+    initialiseGeminiKeyControls();
     setStatus('listeningStatus', '等待生成', 'waiting');
     setStatus('readingStatus', '等待生成', 'waiting');
     setStatus('conversationStatus', '等待生成', 'waiting');
@@ -221,6 +318,10 @@ async function handleUploadSubmit(event) {
         const fileInput = document.getElementById('wordImages');
         const manualInput = document.getElementById('manualWords').value.trim();
         const scenarioInput = document.getElementById('scenarioHint').value.trim();
+        const apiInput = document.getElementById('geminiApiKey');
+        const rememberCheckbox = document.getElementById('rememberGeminiKey');
+        const geminiApiKey = apiInput ? apiInput.value.trim() : '';
+        const rememberGeminiKey = rememberCheckbox ? rememberCheckbox.checked : false;
 
         if (fileInput.files.length > 0) {
             Array.from(fileInput.files).forEach((file) => formData.append('files', file));
@@ -233,6 +334,18 @@ async function handleUploadSubmit(event) {
         }
         if (scenarioInput) {
             formData.append('scenario_hint', scenarioInput);
+        }
+        if (geminiApiKey) {
+            formData.append('gemini_api_key', geminiApiKey);
+        }
+
+        if (rememberCheckbox) {
+            if (rememberGeminiKey) {
+                persistRememberPreference(true);
+                persistGeminiKey(geminiApiKey);
+            } else {
+                persistRememberPreference(false);
+            }
         }
 
         if (window.usageTracker) {
