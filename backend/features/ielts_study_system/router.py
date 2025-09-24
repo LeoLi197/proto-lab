@@ -12,6 +12,7 @@ from collections import OrderedDict
 from copy import deepcopy
 from threading import Lock
 from typing import Dict, Iterable, List, Optional, Tuple
+import textwrap
 import wave
 
 import requests
@@ -329,6 +330,12 @@ class AnswerItem(BaseModel):
 
 class AnswerSheet(BaseModel):
     answers: List[AnswerItem]
+
+
+class ConversationEvaluationRequest(BaseModel):
+    question_id: str = Field(..., min_length=1, description="Conversation question identifier")
+    answer: str = Field(..., min_length=1, description="User supplied answer transcript")
+    gemini_api_key: Optional[str] = Field(default=None, description="Optional Gemini API key override")
 
 
 def _parse_manual_words(raw: Optional[str]) -> List[str]:
@@ -804,13 +811,154 @@ def _prepare_story_payload(raw_story: Dict[str, object], words: List[str]) -> Di
     return story
 
 
+def _build_story_script(story: Dict[str, object]) -> str:
+    parts: List[str] = []
+    for key in ("scenario", "overview"):
+        value = str(story.get(key) or "").strip()
+        if value:
+            parts.append(value)
+    for paragraph in story.get("paragraphs", []):
+        text = str(paragraph or "").strip()
+        if text:
+            parts.append(text)
+    closing = str(story.get("closing") or "").strip()
+    if closing:
+        parts.append(closing)
+    script = "\n".join(part for part in parts if part).strip()
+    if script:
+        return script
+    fallback = " ".join(str(item).strip() for item in story.get("paragraphs", []) if item)
+    if fallback:
+        return fallback
+    return (
+        str(story.get("overview") or "")
+        or str(story.get("scenario") or "")
+        or str(story.get("title") or "")
+    )
+
+
+def _build_word_focus_question(
+    story: Dict[str, object],
+    prefix: str,
+    index: int,
+    context_label: str,
+) -> Tuple[Dict[str, object], Dict[str, object]]:
+    sentences = story.get("sentences") or []
+    detail: Dict[str, object] = {}
+    if sentences:
+        detail = sentences[(index - 1) % len(sentences)] or {}
+    word = str(detail.get("word") or "").strip()
+    paragraphs = story.get("paragraphs") or []
+    sentence = str(detail.get("sentence") or "").strip()
+    if not sentence and paragraphs:
+        sentence = str(paragraphs[(index - 1) % len(paragraphs)] or "").strip()
+    if not sentence:
+        sentence = str(story.get("overview") or story.get("scenario") or "").strip()
+    if not word:
+        candidates = [detail.get("focus_word"), story.get("title"), story.get("setting"), story.get("audience"), story.get("overview")]
+        for candidate in candidates:
+            candidate_text = str(candidate or "").strip()
+            if candidate_text:
+                word = candidate_text
+                break
+        if not word:
+            word = "key point"
+    hint = str(detail.get("hint") or "").strip()
+    if not hint:
+        if word:
+            hint = f"提示：关注 {word} 在情境中的作用。"
+        else:
+            hint = "提示：留意情境中强调的核心词汇。"
+    rationale = str(detail.get("rationale") or "").strip()
+    if not rationale:
+        if word:
+            rationale = f"题目旨在强化词汇 {word} 的运用场景。"
+        else:
+            rationale = "题目旨在强化情境中出现的核心词汇。"
+    focus_words = [word] if word else []
+    if sentence:
+        prompt = f"In the {context_label}, which key vocabulary is highlighted when you encounter: \"{sentence}\"?"
+    else:
+        prompt = f"Which key vocabulary best summarises the {context_label}?"
+    question_id = f"{prefix}{index:02d}"
+    question_payload = {
+        "id": question_id,
+        "prompt": prompt,
+        "hint": hint,
+        "focus_words": focus_words,
+    }
+    answer_value = word or ""
+    answer_meta = {
+        "answer": answer_value or "key point",
+        "alternatives": focus_words,
+        "rationale": rationale,
+    }
+    return question_payload, answer_meta
+
+
+def _prepare_question_set(
+    question_items: List[Dict[str, object]],
+    story: Dict[str, object],
+    prefix: str,
+    total: int,
+    context_label: str,
+) -> Tuple[List[Dict[str, object]], Dict[str, Dict[str, object]]]:
+    try:
+        raw_questions, raw_answers = _split_questions_and_answers(question_items)
+    except HTTPException:
+        raw_questions, raw_answers = [], {}
+    questions: List[Dict[str, object]] = []
+    answers: Dict[str, Dict[str, object]] = {}
+    index = 1
+    for original in raw_questions:
+        if len(questions) >= total:
+            break
+        new_id = f"{prefix}{index:02d}"
+        payload = {key: value for key, value in original.items() if key != "id"}
+        focus_words_raw = payload.get("focus_words")
+        if isinstance(focus_words_raw, list):
+            payload["focus_words"] = [
+                str(item).strip() for item in focus_words_raw if str(item).strip()
+            ]
+        else:
+            payload["focus_words"] = []
+        payload["id"] = new_id
+        questions.append(payload)
+        source_id = original.get("id")
+        answer_meta = raw_answers.get(source_id) or raw_answers.get(new_id)
+        if answer_meta:
+            answers[new_id] = {
+                "answer": str(answer_meta.get("answer") or ""),
+                "alternatives": [
+                    str(option)
+                    for option in answer_meta.get("alternatives", [])
+                    if str(option).strip()
+                ],
+                "rationale": str(answer_meta.get("rationale") or ""),
+            }
+        index += 1
+    while len(questions) < total:
+        fallback_index = len(questions) + 1
+        payload, answer_meta = _build_word_focus_question(
+            story, prefix, fallback_index, context_label
+        )
+        questions.append(payload)
+        answers[payload["id"]] = answer_meta
+    normalised_answers = {
+        question["id"]: answers[question["id"]]
+        for question in questions
+        if question["id"] in answers
+    }
+    return questions, normalised_answers
+
+
 def _prepare_listening_payload(
     listening_raw: Dict[str, object],
     story: Dict[str, object],
     words: List[str],
     api_key: str,
 ) -> Tuple[Dict[str, object], Dict[str, Dict[str, object]]]:
-    script = str(listening_raw.get("script") or " ".join(story.get("paragraphs", [])))
+    script = _build_story_script(story)
     segments_raw = listening_raw.get("segments") or []
     segments: List[Dict[str, object]] = []
     for idx, segment in enumerate(segments_raw, start=1):
@@ -840,7 +988,9 @@ def _prepare_listening_payload(
         ]
 
     questions_raw = listening_raw.get("questions") or []
-    questions, answers = _split_questions_and_answers(questions_raw)
+    questions, answers = _prepare_question_set(
+        questions_raw, story, "L", 5, "listening audio"
+    )
     audio_b64, tts_note = TTS_SYNTHESIZER.synthesize(script, api_key=api_key)
     audio_plan = {
         "available": audio_b64 is not None,
@@ -892,7 +1042,9 @@ def _prepare_reading_payload(
             for detail in story.get("sentences", [])
         ]
     questions_raw = reading_raw.get("questions") or []
-    questions, answers = _split_questions_and_answers(questions_raw)
+    questions, answers = _prepare_question_set(
+        questions_raw, story, "R", 5, "reading passage"
+    )
     metadata_raw = reading_raw.get("metadata")
     metadata = metadata_raw if isinstance(metadata_raw, dict) else {}
     metadata.setdefault("paragraphs", len(paragraphs))
@@ -914,21 +1066,115 @@ def _prepare_reading_payload(
     return payload, answers
 
 
+def _conversation_controls_template() -> List[Dict[str, str]]:
+    return [
+        {"type": "voice_answer", "label": "回答问题"},
+        {"type": "reference_answer", "label": "参考答案"},
+    ]
+
+
+def _build_reference_answer_text(
+    question: Dict[str, object], story: Dict[str, object]
+) -> str:
+    reference = str(question.get("reference_answer") or "").strip()
+    if reference:
+        return reference
+    focus_words = [
+        str(item).strip()
+        for item in question.get("focus_words", [])
+        if str(item).strip()
+    ]
+    focus_lookup = {word.lower() for word in focus_words if word}
+    sentences = story.get("sentences") or []
+    for detail in sentences:
+        word = str(detail.get("word") or "").strip().lower()
+        if focus_lookup and word and word in focus_lookup:
+            candidate = str(detail.get("sentence") or "").strip()
+            if candidate:
+                return candidate
+    paragraphs = story.get("paragraphs") or []
+    for paragraph in paragraphs:
+        candidate = str(paragraph or "").strip()
+        if candidate:
+            return candidate
+    overview = str(story.get("overview") or "").strip()
+    if overview:
+        return overview
+    scenario = str(story.get("scenario") or "").strip()
+    if scenario:
+        return scenario
+    return "Sample answer unavailable."
+
+
+def _build_conversation_fallback_question(
+    story: Dict[str, object], index: int
+) -> Dict[str, object]:
+    sentences = story.get("sentences") or []
+    detail: Dict[str, object] = {}
+    if sentences:
+        detail = sentences[(index - 1) % len(sentences)] or {}
+    word = str(detail.get("word") or "").strip()
+    if not word:
+        word = str(story.get("title") or "topic").strip() or f"topic {index}"
+    question_text = f"How does the scenario highlight \"{word}\"?"
+    follow_up = str(detail.get("hint") or "").strip()
+    if not follow_up:
+        follow_up = f"请进一步说明 {word} 在情景中的具体运用。"
+    answer_explanation = str(detail.get("rationale") or "").strip()
+    if not answer_explanation:
+        answer_explanation = f"回答需覆盖关键词 {word} 并结合情境描述。"
+    reference_answer = str(detail.get("sentence") or "").strip()
+    fallback_question = {
+        "id": f"C{index:02d}",
+        "question": question_text,
+        "focus_words": [word] if word else [],
+        "follow_up": follow_up,
+        "reference_answer": reference_answer,
+        "answer_explanation": answer_explanation,
+        "controls": _conversation_controls_template(),
+    }
+    fallback_question["reference_answer"] = _build_reference_answer_text(
+        fallback_question, story
+    )
+    return fallback_question
+
+
 def _prepare_conversation_payload(conversation_raw: Dict[str, object], story: Dict[str, object]) -> Dict[str, object]:
     questions: List[Dict[str, object]] = []
     for idx, item in enumerate(conversation_raw.get("questions") or [], start=1):
+        if len(questions) >= 5:
+            break
         if not isinstance(item, dict):
             continue
-        questions.append(
-            {
-                "id": item.get("id") or f"C{idx:02d}",
-                "question": item.get("question") or "",
-                "focus_words": item.get("focus_words") or [],
-                "follow_up": item.get("follow_up") or "",
-                "reference_answer": item.get("reference_answer") or "",
-                "answer_explanation": item.get("answer_explanation") or "",
-            }
-        )
+        focus_words_raw = item.get("focus_words")
+        focus_words = [
+            str(value).strip()
+            for value in (focus_words_raw or [])
+            if str(value).strip()
+        ]
+        question = {
+            "id": f"C{idx:02d}",
+            "question": str(item.get("question") or ""),
+            "focus_words": focus_words,
+            "follow_up": str(item.get("follow_up") or ""),
+            "reference_answer": str(item.get("reference_answer") or ""),
+            "answer_explanation": str(item.get("answer_explanation") or ""),
+            "controls": item.get("controls"),
+        }
+        if not isinstance(question["controls"], list) or not question["controls"]:
+            question["controls"] = _conversation_controls_template()
+        question["reference_answer"] = _build_reference_answer_text(question, story)
+        if not question["answer_explanation"]:
+            if focus_words:
+                question["answer_explanation"] = (
+                    "请尝试覆盖提示中的关键词，并结合追问展开作答。"
+                )
+            else:
+                question["answer_explanation"] = "请结合情景给出完整回答。"
+        questions.append(question)
+    while len(questions) < 5:
+        fallback_index = len(questions) + 1
+        questions.append(_build_conversation_fallback_question(story, fallback_index))
     agenda = conversation_raw.get("agenda")
     if not isinstance(agenda, list) or not agenda:
         agenda = [
@@ -957,8 +1203,21 @@ def _prepare_conversation_payload(conversation_raw: Dict[str, object], story: Di
                 ],
             },
         ]
-    voice_prompts = conversation_raw.get("voice_prompts")
-    if not isinstance(voice_prompts, list) or len(voice_prompts) != len(questions):
+    voice_prompts_raw = conversation_raw.get("voice_prompts")
+    if isinstance(voice_prompts_raw, list) and len(voice_prompts_raw) == len(questions):
+        voice_prompts = [
+            {
+                "order": int(item.get("order") or idx + 1),
+                "text": str(item.get("text") or questions[idx]["question"]),
+                "focus_words": [
+                    str(value).strip()
+                    for value in (item.get("focus_words") or questions[idx]["focus_words"])
+                    if str(value).strip()
+                ],
+            }
+            for idx, item in enumerate(voice_prompts_raw)
+        ]
+    else:
         voice_prompts = [
             {
                 "order": idx + 1,
@@ -973,6 +1232,7 @@ def _prepare_conversation_payload(conversation_raw: Dict[str, object], story: Di
             "点击或按住下方按钮即可开始语音回答，浏览器会自动转写文字。",
             "如果识别不稳定，可在放开按钮后手动修改文本再提交。",
             "确保回答覆盖提示中的重点词汇，并按照追问提示进一步展开。",
+            "随时点击“参考答案”按钮查看文字示例，对比差距并继续优化。",
         ]
     conversation = {
         "role": conversation_raw.get("role")
@@ -1024,7 +1284,9 @@ def _build_materials_prompt(words: List[str], scenario_hint: Optional[str]) -> s
         "2. 听力和阅读题目的 ID 分别以 L 和 R 开头并从 01 递增，提供标准答案、备选答案和解析。\n"
         "3. 所有提示与说明使用中文，题干可使用英文。\n"
         "4. conversation.voice_prompts 数量需与 questions 对齐。\n"
-        "5. 不得返回除 JSON 以外的任何内容。\n"
+        "5. 听力与阅读题目数量都固定为 5 道，并确保紧扣情境内容。\n"
+        "6. conversation.questions 需固定 5 道，并为每道题附带 controls 字段，包含“回答问题”和“参考答案”两个按钮。\n"
+        "7. 不得返回除 JSON 以外的任何内容。\n"
         "词汇列表：\n"
         f"{bullet_list}\n"
         f"情景提示：{hint}\n"
@@ -1043,6 +1305,39 @@ async def _generate_materials_via_gemini(
     if not isinstance(payload, dict):
         raise HTTPException(status_code=502, detail="Gemini 输出格式异常，请稍后重试。")
     return payload
+
+
+def _summarise_story_for_prompt(story: Dict[str, object]) -> str:
+    lines: List[str] = []
+    title = str(story.get("title") or "").strip()
+    if title:
+        lines.append(f"Title: {title}")
+    scenario = str(story.get("scenario") or "").strip()
+    if scenario:
+        lines.append(f"Scenario: {scenario}")
+    overview = str(story.get("overview") or "").strip()
+    if overview:
+        lines.append(f"Overview: {overview}")
+    setting = str(story.get("setting") or "").strip()
+    if setting:
+        lines.append(f"Setting: {setting}")
+    audience = str(story.get("audience") or "").strip()
+    if audience:
+        lines.append(f"Audience: {audience}")
+    sentences = story.get("sentences") or []
+    highlights: List[str] = []
+    for detail in sentences[:5]:
+        if not isinstance(detail, dict):
+            continue
+        word = str(detail.get("word") or "").strip()
+        sentence = str(detail.get("sentence") or "").strip()
+        if word and sentence:
+            highlights.append(f"{word}: {sentence}")
+        elif sentence:
+            highlights.append(sentence)
+    if highlights:
+        lines.append("Key sentences: " + " | ".join(highlights))
+    return "\n".join(lines)
 
 
 def _normalise_answer(text: str) -> str:
@@ -1080,6 +1375,84 @@ def _evaluate_answers(
         "total": total,
         "accuracy": accuracy,
         "breakdown": breakdown,
+    }
+
+
+def _evaluate_conversation_answer_via_gemini(
+    question: Dict[str, object], story: Dict[str, object], answer: str, api_key: str
+) -> Dict[str, object]:
+    reference_answer = _build_reference_answer_text(question, story)
+    focus_words = [
+        str(item).strip()
+        for item in question.get("focus_words", [])
+        if str(item).strip()
+    ]
+    story_summary = _summarise_story_for_prompt(story)
+    follow_up = str(question.get("follow_up") or "无")
+    prompt = textwrap.dedent(
+        f"""
+        你是一名雅思口语考官，请根据以下上下文对考生的回答进行评分。请确保输出严格的 JSON 对象，不要包含额外说明。
+
+        场景信息：
+        {story_summary or '无详细场景描述'}
+
+        当前问题：{question.get('question') or ''}
+        追问：{follow_up}
+        重点词汇：{', '.join(focus_words) or '无特别指定'}
+        参考答案：{reference_answer}
+
+        考生回答：{answer}
+
+        输出 JSON 字段要求：
+        {{
+            "score": 0 到 100 的整数,
+            "feedback": "中文点评，指出亮点与需要改进的部分",
+            "improved_answer": "一份更好的英文答案，覆盖全部重点词汇",
+            "focus_words": {{
+                "covered": ["已使用的重点词汇"],
+                "missing": ["未覆盖的重点词汇"]
+            }}
+        }}
+        如果没有重点词汇缺失，missing 返回空数组。
+        """
+    ).strip()
+    raw = _call_gemini_sync(prompt, None, "application/json", api_key)
+    try:
+        payload = _parse_gemini_json(raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=f"Gemini 评分返回异常：{exc}") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=502, detail="Gemini 评分未返回有效 JSON。")
+
+    def _extract_list(source: object) -> List[str]:
+        if isinstance(source, list):
+            return [str(item).strip() for item in source if str(item).strip()]
+        return []
+
+    focus_meta = payload.get("focus_words") or {}
+    covered = _extract_list(focus_meta.get("covered") or payload.get("covered"))
+    missing = _extract_list(focus_meta.get("missing") or payload.get("missing"))
+    score_raw = payload.get("score")
+    try:
+        score = int(score_raw)
+    except (TypeError, ValueError):
+        score = 0
+    score = max(0, min(100, score))
+    feedback = str(payload.get("feedback") or payload.get("commentary") or "").strip()
+    improved_answer = str(
+        payload.get("improved_answer")
+        or payload.get("improvedAnswer")
+        or ""
+    ).strip()
+    if not improved_answer:
+        improved_answer = reference_answer
+
+    return {
+        "score": score,
+        "feedback": feedback or "请根据提示调整答案。",
+        "improved_answer": improved_answer,
+        "focus_words": {"covered": covered, "missing": missing},
+        "reference_answer": reference_answer,
     }
 
 
@@ -1210,4 +1583,33 @@ def get_conversation_playbook(session_id: str) -> Dict[str, object]:
         "practice_tips": session["conversation"]["practice_tips"],
         "closing_line": session["conversation"]["closing_line"],
     }
+
+
+@router.post("/conversation/{session_id}/evaluate")
+async def evaluate_conversation_answer(
+    session_id: str,
+    payload: ConversationEvaluationRequest,
+    request: Request,
+) -> Dict[str, object]:
+    session = SESSION_STORE.get(session_id)
+    question = next(
+        (
+            item
+            for item in session["conversation"]["questions"]
+            if item.get("id") == payload.question_id
+        ),
+        None,
+    )
+    if not question:
+        raise HTTPException(status_code=404, detail="未找到对应的会话问题。")
+    header_api_key = request.headers.get("X-Gemini-Api-Key")
+    resolved_api_key = _get_gemini_api_key(payload.gemini_api_key or header_api_key)
+    result = await run_in_threadpool(
+        _evaluate_conversation_answer_via_gemini,
+        question,
+        session["story"],
+        payload.answer,
+        resolved_api_key,
+    )
+    return {"question_id": question["id"], **result}
 
