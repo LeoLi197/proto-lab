@@ -65,10 +65,4 @@ const FEATURES = [
         description: '面向小学生的国际象棋学习和对弈模块，包含智能棋友、友好提示与每日谜题。',
         isFullPath: true
     },
-    {
-        path: 'ielts-study-system/index.html',
-        name: '🎓 雅思智能学习系统',
-        description: '专业雅思备考平台，整合听说读写训练、个性化学习路径、词汇复习与模考分析。',
-        isFullPath: true
-    },
 ];
