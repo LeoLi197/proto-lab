@@ -1479,10 +1479,13 @@ def _evaluate_answers(
     answer_lookup = {item.question_id: item.answer for item in submission.answers}
     breakdown: List[Dict[str, object]] = []
     correct = 0
-    for question_id, meta in answer_bank.items():
+    evaluated = 0
+    for question_id, user_answer in answer_lookup.items():
+        if question_id not in answer_bank:
+            continue
+        meta = answer_bank[question_id]
         expected = meta["answer"]
         alternatives = {expected, *[alt for alt in meta.get("alternatives", [])]}
-        user_answer = answer_lookup.get(question_id, "")
         normalised_user = _normalise_answer(user_answer)
         candidates = {_normalise_answer(str(option)) for option in alternatives}
         is_correct = bool(normalised_user) and normalised_user in candidates
@@ -1497,7 +1500,8 @@ def _evaluate_answers(
                 "rationale": meta.get("rationale"),
             }
         )
-    total = len(answer_bank)
+        evaluated += 1
+    total = evaluated or len(answer_bank)
     accuracy = round(correct / total, 2) if total else 0.0
     return {
         "score": correct,
