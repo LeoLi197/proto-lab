@@ -278,6 +278,21 @@ def _pcm_to_wav_bytes(
     return buffer.getvalue()
 
 
+def _extract_wav_frames(wav_bytes: bytes) -> Optional[Tuple[int, int, int, bytes]]:
+    """Extract PCM frames and parameters from a WAV payload."""
+
+    buffer = io.BytesIO(wav_bytes)
+    try:
+        with wave.open(buffer, "rb") as wav_file:
+            params = wav_file.getparams()
+            if params.comptype not in {"NONE", "not compressed"}:
+                return None
+            frames = wav_file.readframes(params.nframes or 0)
+            return params.nchannels, params.sampwidth, params.framerate, frames
+    except (wave.Error, EOFError, ValueError):
+        return None
+
+
 def _ensure_base64_text(value: object) -> str:
     if isinstance(value, (bytes, bytearray)):
         try:
@@ -330,7 +345,11 @@ def _merge_audio_segments(
     combined = bytearray()
     resolved_hint: Optional[str] = None
     resolved_metadata: Optional[Dict[str, object]] = None
-    fallback_segment: Optional[Tuple[object, Optional[str], Optional[Dict[str, object]]]] = None
+    fallback_segment: Optional[Tuple[str, Optional[str], Optional[Dict[str, object]]]] = None
+    wav_params: Optional[Tuple[int, int, int]] = None
+    wav_frames: List[bytes] = []
+    saw_wav_segment = False
+    wav_merge_failed = False
 
     for raw_data, raw_mime, metadata in segments:
         if raw_data is None:
@@ -338,17 +357,73 @@ def _merge_audio_segments(
         base64_text = _ensure_base64_text(raw_data)
         if not base64_text:
             continue
+        if fallback_segment is None:
+            fallback_segment = (base64_text, raw_mime, metadata)
         if resolved_hint is None and raw_mime:
             resolved_hint = raw_mime
         if resolved_metadata is None and isinstance(metadata, dict):
             resolved_metadata = metadata
         try:
-            combined.extend(base64.b64decode(base64_text))
+            decoded = base64.b64decode(base64_text)
         except (binascii.Error, ValueError):
+            # Base64 解码失败时回退到当前片段
             if fallback_segment is None:
                 fallback_segment = (base64_text, raw_mime, metadata)
+            continue
+
+        normalised_mime = _normalise_mime_hint(raw_mime)
+        if not wav_merge_failed:
+            is_wav_payload = False
+            if normalised_mime == "audio/wav":
+                is_wav_payload = True
+            elif len(decoded) >= 12 and decoded[:4] == b"RIFF" and decoded[8:12] == b"WAVE":
+                is_wav_payload = True
+            if is_wav_payload:
+                saw_wav_segment = True
+                extracted = _extract_wav_frames(decoded)
+                if extracted is None:
+                    wav_merge_failed = True
+                else:
+                    channels, sample_width, frame_rate, frames = extracted
+                    params = (channels, sample_width, frame_rate)
+                    if wav_params is None:
+                        wav_params = params
+                    elif params != wav_params:
+                        wav_merge_failed = True
+                    if not wav_merge_failed:
+                        wav_frames.append(frames)
+                        continue
+                # WAV 解析失败时将原始字节拼接到回退缓冲
+                combined.extend(decoded)
+                if fallback_segment is None:
+                    fallback_segment = (base64_text, raw_mime, metadata)
+                continue
+
+        combined.extend(decoded)
+
+    if saw_wav_segment and not wav_merge_failed and wav_params and wav_frames:
+        channels, sample_width, frame_rate = wav_params
+        buffer = io.BytesIO()
+        with wave.open(buffer, "wb") as wav_file:
+            wav_file.setnchannels(max(1, channels))
+            wav_file.setsampwidth(max(1, sample_width))
+            wav_file.setframerate(max(1, frame_rate))
+            for frames in wav_frames:
+                if frames:
+                    wav_file.writeframes(frames)
+        merged_wav = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        return merged_wav, "audio/wav"
 
     if combined:
+        if saw_wav_segment and wav_merge_failed and fallback_segment:
+            raw_data, raw_mime, metadata = fallback_segment
+            data, mime = _normalise_audio_payload(
+                raw_data,
+                raw_mime,
+                requested_mime_type,
+                metadata if isinstance(metadata, dict) else None,
+            )
+            return data, mime
         merged_b64 = base64.b64encode(bytes(combined)).decode("utf-8")
         data, mime = _normalise_audio_payload(
             merged_b64,
