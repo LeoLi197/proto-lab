@@ -64,6 +64,18 @@ function shouldRememberGeminiKey() {
     return readFromLocalStorage(GEMINI_REMEMBER_STORAGE_KEY) === 'true';
 }
 
+function getActiveGeminiApiKey() {
+    const input = document.getElementById('geminiApiKey');
+    if (input && typeof input.value === 'string') {
+        const trimmed = input.value.trim();
+        if (trimmed) {
+            return trimmed;
+        }
+    }
+    const stored = getStoredGeminiKey();
+    return stored || '';
+}
+
 function persistGeminiKey(value) {
     const trimmed = typeof value === 'string' ? value.trim() : '';
     if (trimmed) {
@@ -903,7 +915,11 @@ function renderConversationSection(conversation) {
             <div class="coach-body">
                 <div id="conversationTranscript" class="coach-transcript hint">按住下方按钮即可开始回答，系统会自动转写你的语音。</div>
                 <div id="conversationFeedback" class="coach-feedback"></div>
-                <button type="button" id="conversationAnswerBtn" class="push-to-talk">按住回答</button>
+                <div id="conversationReferencePanel" class="coach-reference-panel"></div>
+                <div class="coach-actions">
+                    <button type="button" id="conversationAnswerBtn" class="push-to-talk">按住回答</button>
+                    <button type="button" id="conversationReferenceBtn" class="coach-reference-btn">参考答案</button>
+                </div>
                 <div id="conversationFallback" class="manual-answer" style="display:none;">
                     <textarea id="conversationManualInput" rows="3" placeholder="若语音识别不可用，可在此输入答案。"></textarea>
                     <button type="button" id="conversationManualSubmit" class="coach-manual-submit">提交文本回答</button>
@@ -926,8 +942,10 @@ function setupGuidedConversation(container, conversation) {
     const questionBox = container.querySelector('#conversationQuestionText');
     const repeatBtn = container.querySelector('#conversationRepeatBtn');
     const answerBtn = container.querySelector('#conversationAnswerBtn');
+    const referenceBtn = container.querySelector('#conversationReferenceBtn');
     const transcriptBox = container.querySelector('#conversationTranscript');
     const feedbackBox = container.querySelector('#conversationFeedback');
+    const referencePanel = container.querySelector('#conversationReferencePanel');
     const progressItems = Array.from(container.querySelectorAll('#conversationProgress li'));
     const fallbackWrapper = container.querySelector('#conversationFallback');
     const manualInput = container.querySelector('#conversationManualInput');
@@ -938,9 +956,14 @@ function setupGuidedConversation(container, conversation) {
     let recognition = createSpeechRecognition();
     let isListening = false;
     let hasResult = false;
+    let isEvaluating = false;
+    let conversationFinished = false;
     let nextQuestionTimer = null;
     let destroyed = false;
     let manualHandlerAttached = false;
+    let manualFallbackEnabled = false;
+    let answerButtonLabel = '按住回答';
+    let referenceButtonLabel = '参考答案';
 
     if (manualSubmit) {
         manualSubmit.disabled = true;
@@ -954,6 +977,10 @@ function setupGuidedConversation(container, conversation) {
             answerBtn.disabled = true;
             answerBtn.textContent = '暂无问题';
         }
+        if (referenceBtn) {
+            referenceBtn.disabled = true;
+            referenceBtn.textContent = '参考答案';
+        }
         if (fallbackWrapper) {
             fallbackWrapper.style.display = 'none';
         }
@@ -963,6 +990,23 @@ function setupGuidedConversation(container, conversation) {
             },
         };
     }
+
+    const resolveControlLabel = (question, type, fallback) => {
+        if (!question || !Array.isArray(question.controls)) {
+            return fallback;
+        }
+        const control = question.controls.find((item) => item && item.type === type);
+        if (control && control.label) {
+            return control.label;
+        }
+        return fallback;
+    };
+
+    const clearReferencePanel = () => {
+        if (referencePanel) {
+            referencePanel.innerHTML = '';
+        }
+    };
 
     const resetTranscript = () => {
         if (transcriptBox) {
@@ -974,6 +1018,7 @@ function setupGuidedConversation(container, conversation) {
         if (manualInput) {
             manualInput.value = '';
         }
+        clearReferencePanel();
     };
 
     const getCurrentQuestion = () => conversation.questions[currentIndex];
@@ -993,6 +1038,20 @@ function setupGuidedConversation(container, conversation) {
             ${focusHtml}
             ${followUp}
         `;
+        answerButtonLabel = resolveControlLabel(question, 'voice_answer', '按住回答');
+        referenceButtonLabel = resolveControlLabel(question, 'reference_answer', '参考答案');
+        if (answerBtn) {
+            answerBtn.disabled = false;
+            answerBtn.textContent = answerButtonLabel;
+        }
+        if (referenceBtn) {
+            referenceBtn.disabled = false;
+            referenceBtn.textContent = referenceButtonLabel;
+        }
+        if (feedbackBox) {
+            feedbackBox.innerHTML = '';
+        }
+        clearReferencePanel();
     };
 
     const updateProgress = (completed = false) => {
@@ -1004,16 +1063,18 @@ function setupGuidedConversation(container, conversation) {
         if (!question) return;
         const prompt = conversation.voice_prompts && conversation.voice_prompts[currentIndex];
         const line = prompt && prompt.text ? prompt.text : question.question;
-        if (line) {
-            if ('speechSynthesis' in window) {
-                speakText(line);
-            }
+        if (line && 'speechSynthesis' in window) {
+            speakText(line);
         }
     };
 
     const askQuestion = () => {
         clearTimeout(nextQuestionTimer);
         resetTranscript();
+        const question = getCurrentQuestion();
+        if (question) {
+            question.latestEvaluation = null;
+        }
         updateQuestionView();
         updateProgress(false);
         if (closingHint) {
@@ -1024,11 +1085,16 @@ function setupGuidedConversation(container, conversation) {
 
     const finishConversation = () => {
         clearTimeout(nextQuestionTimer);
+        conversationFinished = true;
         updateConversationProgress(progressItems, progressItems.length, true);
         if (answerBtn) {
             answerBtn.disabled = true;
             answerBtn.classList.remove('recording');
             answerBtn.textContent = '练习已完成';
+        }
+        if (referenceBtn) {
+            referenceBtn.disabled = false;
+            referenceBtn.textContent = referenceButtonLabel;
         }
         if (feedbackBox) {
             feedbackBox.innerHTML = '<div class="coach-feedback-success">🎉 已完成全部问题，继续复盘练习提示吧！</div>';
@@ -1041,7 +1107,20 @@ function setupGuidedConversation(container, conversation) {
         }
     };
 
-    const evaluateAndRespond = (transcript) => {
+    const renderReferencePanel = (question) => {
+        if (!referencePanel || !question) return;
+        const baseReference = question.reference_answer || buildReferenceAnswer(question);
+        const referenceHtml = baseReference ? formatMultilineText(baseReference) : '暂无参考答案';
+        const explanationHtml = question.answer_explanation
+            ? `<div class="coach-feedback-hint">${formatMultilineText(question.answer_explanation)}</div>`
+            : '';
+        const improved = question.latestEvaluation && question.latestEvaluation.improved_answer
+            ? `<div class="coach-improved"><strong>更优答案：</strong>${formatMultilineText(question.latestEvaluation.improved_answer)}</div>`
+            : '';
+        referencePanel.innerHTML = `<div class="coach-reference"><strong>参考答案：</strong>${referenceHtml}</div>${explanationHtml}${improved}`;
+    };
+
+    const evaluateAndRespond = async (transcript) => {
         if (!transcriptBox || !feedbackBox) return;
         const trimmed = transcript.trim();
         if (!trimmed) {
@@ -1050,26 +1129,80 @@ function setupGuidedConversation(container, conversation) {
         }
         transcriptBox.textContent = trimmed;
         const question = getCurrentQuestion();
-        if (!question) {
+        if (!question || isEvaluating) {
             return;
         }
-        const result = evaluateConversationAnswer(trimmed, question);
-        if (result.passed) {
-            feedbackBox.innerHTML = `<div class="coach-feedback-success">👍 ${result.adviceHtml}</div>`;
-            if (currentIndex < conversation.questions.length - 1) {
-                clearTimeout(nextQuestionTimer);
-                nextQuestionTimer = window.setTimeout(() => {
-                    currentIndex += 1;
-                    askQuestion();
-                }, 1200);
-            } else {
-                finishConversation();
-            }
-        } else {
-            const reference = result.referenceHtml
-                ? `<div class="coach-reference"><strong>参考答案：</strong>${result.referenceHtml}</div>`
+        isEvaluating = true;
+        if (answerBtn) {
+            answerBtn.disabled = true;
+            answerBtn.classList.remove('recording');
+            answerBtn.textContent = '判分中...';
+        }
+        if (referenceBtn) {
+            referenceBtn.disabled = true;
+        }
+        if (manualSubmit && manualFallbackEnabled && !conversationFinished) {
+            manualSubmit.disabled = true;
+        }
+        if (feedbackBox) {
+            feedbackBox.innerHTML = '<div class="hint">大模型评分中，请稍候...</div>';
+        }
+        clearReferencePanel();
+        try {
+            const result = await requestConversationEvaluation(question, trimmed);
+            question.latestEvaluation = result;
+            const focusMeta = result.focus_words || {};
+            const missing = (focusMeta.missing || []).filter(Boolean);
+            const covered = (focusMeta.covered || []).filter(Boolean);
+            const passed = result.score >= 75 && missing.length === 0;
+            const focusHtml = missing.length
+                ? `<div class="coach-feedback-hint">缺少关键词：${missing.map(escapeHtml).join('、')}</div>`
+                : covered.length
+                ? `<div class="coach-feedback-hint">已覆盖关键词：${covered.map(escapeHtml).join('、')}</div>`
                 : '';
-            feedbackBox.innerHTML = `<div class="coach-feedback-error">❗ ${result.adviceHtml}</div>${reference}`;
+            const adviceText = result.feedback
+                ? formatMultilineText(result.feedback)
+                : passed
+                ? '回答已覆盖核心要点，继续保持。'
+                : '请根据提示补充答案并覆盖缺失的关键词。';
+            const improvedHtml = result.improved_answer
+                ? `<div class="coach-improved"><strong>更优答案：</strong>${formatMultilineText(result.improved_answer)}</div>`
+                : '';
+            const baseClass = passed ? 'coach-feedback-success' : 'coach-feedback-error';
+            const baseIcon = passed ? '👍' : '❗';
+            feedbackBox.innerHTML = `<div class="${baseClass}">${baseIcon} 得分 ${result.score}</div>${focusHtml}<div class="coach-feedback-hint">${adviceText}</div>${improvedHtml}`;
+            if (referenceBtn) {
+                referenceBtn.disabled = false;
+            }
+            if (passed) {
+                updateProgress(true);
+                if (currentIndex < conversation.questions.length - 1) {
+                    clearTimeout(nextQuestionTimer);
+                    nextQuestionTimer = window.setTimeout(() => {
+                        currentIndex += 1;
+                        askQuestion();
+                    }, 1500);
+                } else {
+                    finishConversation();
+                }
+            } else {
+                updateProgress(false);
+            }
+        } catch (error) {
+            const message = error && error.message ? error.message : '评分失败，请稍后重试。';
+            feedbackBox.innerHTML = `<div class="coach-feedback-error">❗ ${escapeHtml(message)}</div>`;
+            if (referenceBtn) {
+                referenceBtn.disabled = false;
+            }
+        } finally {
+            isEvaluating = false;
+            if (answerBtn && !conversationFinished) {
+                answerBtn.disabled = false;
+                answerBtn.textContent = answerButtonLabel;
+            }
+            if (manualSubmit && manualFallbackEnabled && !conversationFinished) {
+                manualSubmit.disabled = false;
+            }
         }
     };
 
@@ -1079,6 +1212,7 @@ function setupGuidedConversation(container, conversation) {
     };
 
     const enableManualFallback = (message) => {
+        manualFallbackEnabled = true;
         if (fallbackWrapper) {
             fallbackWrapper.style.display = 'block';
         }
@@ -1107,7 +1241,7 @@ function setupGuidedConversation(container, conversation) {
         }
         const startListening = (event) => {
             event.preventDefault();
-            if (!recognition || isListening) {
+            if (!recognition || isListening || isEvaluating || conversationFinished) {
                 return;
             }
             hasResult = false;
@@ -1115,7 +1249,6 @@ function setupGuidedConversation(container, conversation) {
                 recognition.start();
             } catch (err) {
                 enableManualFallback('语音识别不可用');
-                return;
             }
         };
         const stopListening = () => {
@@ -1150,9 +1283,11 @@ function setupGuidedConversation(container, conversation) {
 
         recognition.onend = () => {
             isListening = false;
-            if (answerBtn) {
+            if (answerBtn && !conversationFinished) {
                 answerBtn.classList.remove('recording');
-                answerBtn.textContent = '按住回答';
+                if (!isEvaluating) {
+                    answerBtn.textContent = answerButtonLabel;
+                }
             }
             if (!hasResult && transcriptBox) {
                 transcriptBox.textContent = '未识别到语音，请重试或手动输入。';
@@ -1162,9 +1297,9 @@ function setupGuidedConversation(container, conversation) {
         recognition.onerror = (event) => {
             hasResult = true;
             isListening = false;
-            if (answerBtn) {
+            if (answerBtn && !conversationFinished) {
                 answerBtn.classList.remove('recording');
-                answerBtn.textContent = '按住回答';
+                answerBtn.textContent = answerButtonLabel;
             }
             const message = event.error === 'no-speech'
                 ? '没有检测到语音，请再试一次。'
@@ -1200,6 +1335,11 @@ function setupGuidedConversation(container, conversation) {
     if (repeatBtn) {
         repeatBtn.addEventListener('click', () => {
             speakCurrentQuestion();
+        });
+    }
+    if (referenceBtn) {
+        referenceBtn.addEventListener('click', () => {
+            renderReferencePanel(getCurrentQuestion());
         });
     }
 
@@ -1242,42 +1382,6 @@ function createSpeechRecognition() {
     }
 }
 
-function evaluateConversationAnswer(transcript, question) {
-    const normalisedTranscript = normaliseUtterance(transcript);
-    const focusPairs = (question.focus_words || [])
-        .map((word) => ({ original: word, normalised: normaliseUtterance(word) }))
-        .filter((item) => !!item.normalised);
-    const missing = focusPairs.filter((item) => !normalisedTranscript.includes(item.normalised));
-    const passed = Boolean(normalisedTranscript) && missing.length === 0;
-
-    const referenceHtml = question.reference_answer
-        ? formatMultilineText(question.reference_answer)
-        : buildReferenceAnswer(question);
-
-    let adviceHtml;
-    if (passed) {
-        adviceHtml = question.answer_explanation
-            ? formatMultilineText(question.answer_explanation)
-            : '你的回答已经涵盖了核心词汇，可以进入下一题。';
-    } else {
-        adviceHtml = buildFailureAdvice(missing, question);
-    }
-
-    return {
-        passed,
-        referenceHtml,
-        adviceHtml,
-    };
-}
-
-function normaliseUtterance(text) {
-    return text
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
 function formatMultilineText(text) {
     return escapeHtml(text).replace(/\n/g, '<br>');
 }
@@ -1293,16 +1397,6 @@ function buildReferenceAnswer(question) {
         return `可按照以下提示展开：${escapeHtml(question.follow_up)}`;
     }
     return '请围绕问题给出结构清晰的完整作答。';
-}
-
-function buildFailureAdvice(missingPairs, question) {
-    const missingText = missingPairs.length
-        ? `缺少关键词：${missingPairs.map((item) => `<mark>${escapeHtml(item.original)}</mark>`).join('、')}。`
-        : '';
-    const explanation = question.answer_explanation
-        ? formatMultilineText(question.answer_explanation)
-        : '请尝试补充提示中的关键词，并按照追问提示展开更多细节。';
-    return missingText ? `${missingText}<br>${explanation}` : explanation;
 }
 
 function updateConversationProgress(items, activeIndex, completed) {
@@ -1428,4 +1522,31 @@ function renderEvaluationResult(container, result) {
         <p>正确率：${accuracy}%</p>
         <ul>${breakdown}</ul>
     `;
+}
+
+async function requestConversationEvaluation(question, answer) {
+    if (!question || !question.id) {
+        throw new Error('当前问题不存在，无法评分。');
+    }
+    if (!currentSessionId) {
+        throw new Error('尚未初始化学习会话，请重新生成学习材料。');
+    }
+    const payload = {
+        question_id: question.id,
+        answer,
+    };
+    const geminiKey = getActiveGeminiApiKey();
+    if (geminiKey) {
+        payload.gemini_api_key = geminiKey;
+    }
+    const response = await fetch(`/api/ielts/conversation/${currentSessionId}/evaluate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        const message = await safeRead(response);
+        throw new Error(message || '口语评分失败');
+    }
+    return response.json();
 }
