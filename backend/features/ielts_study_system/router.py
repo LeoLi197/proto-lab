@@ -323,6 +323,54 @@ def _normalise_audio_payload(
     return base64_text, normalised_requested or "audio/wav"
 
 
+def _merge_audio_segments(
+    segments: List[Tuple[object, Optional[str], Optional[Dict[str, object]]]],
+    requested_mime_type: Optional[str],
+) -> Tuple[Optional[str], Optional[str]]:
+    combined = bytearray()
+    resolved_hint: Optional[str] = None
+    resolved_metadata: Optional[Dict[str, object]] = None
+    fallback_segment: Optional[Tuple[object, Optional[str], Optional[Dict[str, object]]]] = None
+
+    for raw_data, raw_mime, metadata in segments:
+        if raw_data is None:
+            continue
+        base64_text = _ensure_base64_text(raw_data)
+        if not base64_text:
+            continue
+        if resolved_hint is None and raw_mime:
+            resolved_hint = raw_mime
+        if resolved_metadata is None and isinstance(metadata, dict):
+            resolved_metadata = metadata
+        try:
+            combined.extend(base64.b64decode(base64_text))
+        except (binascii.Error, ValueError):
+            if fallback_segment is None:
+                fallback_segment = (base64_text, raw_mime, metadata)
+
+    if combined:
+        merged_b64 = base64.b64encode(bytes(combined)).decode("utf-8")
+        data, mime = _normalise_audio_payload(
+            merged_b64,
+            resolved_hint,
+            requested_mime_type,
+            resolved_metadata,
+        )
+        return data, mime
+
+    if fallback_segment:
+        raw_data, raw_mime, metadata = fallback_segment
+        data, mime = _normalise_audio_payload(
+            raw_data,
+            raw_mime,
+            requested_mime_type,
+            metadata if isinstance(metadata, dict) else None,
+        )
+        return data, mime
+
+    return None, None
+
+
 class AnswerItem(BaseModel):
     question_id: str = Field(..., description="Question identifier")
     answer: str = Field(..., min_length=1, description="User supplied answer")
@@ -442,24 +490,30 @@ def _call_gemini_tts(
     for candidate in candidates:
         content = candidate.get("content") or {}
         parts = content.get("parts") or []
+        audio_segments: List[Tuple[object, Optional[str], Optional[Dict[str, object]]]] = []
         for part in parts:
             inline = part.get("inline_data") or part.get("inlineData")
             if isinstance(inline, dict) and inline.get("data"):
-                data, resolved_mime = _normalise_audio_payload(
-                    inline.get("data"),
-                    inline.get("mime_type") or inline.get("mimeType"),
-                    mime_type,
-                    inline,
+                audio_segments.append(
+                    (
+                        inline.get("data"),
+                        inline.get("mime_type") or inline.get("mimeType"),
+                        inline,
+                    )
                 )
-                return data, resolved_mime
+                continue
             audio = part.get("audio")
             if isinstance(audio, dict) and audio.get("data"):
-                data, resolved_mime = _normalise_audio_payload(
-                    audio.get("data"),
-                    audio.get("mime_type") or audio.get("mimeType"),
-                    mime_type,
-                    audio,
+                audio_segments.append(
+                    (
+                        audio.get("data"),
+                        audio.get("mime_type") or audio.get("mimeType"),
+                        audio,
+                    )
                 )
+        if audio_segments:
+            data, resolved_mime = _merge_audio_segments(audio_segments, mime_type)
+            if data and resolved_mime:
                 return data, resolved_mime
     finish_reasons = [
         candidate.get("finishReason")
