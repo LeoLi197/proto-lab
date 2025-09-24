@@ -3,102 +3,126 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>雅思情景化学习系统</title>
+    <title>IELTS 情景化学习系统</title>
     <link rel="stylesheet" href="../../style.css">
+    <link rel="stylesheet" href="./styles.css">
     <link rel="icon" href="../../public/favicon.ico">
 </head>
-<body>
-    <div class="feature-container ielts-container">
-        <header class="hero">
-            <div class="hero-copy">
-                <a class="back-link" href="../../dashboard.html">← 返回功能中心</a>
+<body class="ielts-theme">
+    <div class="feature-container ielts-app">
+        <header class="app-header">
+            <a class="back-link" href="../../dashboard.html">← 返回功能中心</a>
+            <div>
                 <h1>IELTS 情景化学习系统</h1>
-                <p class="intro">上传单词或实物照片，系统会自动识别关键词并生成对应的英语情景片段，让每个词汇都置于真实语境。</p>
-                <div class="hero-badges">
-                    <span class="hero-badge">Gemini OCR 驱动</span>
-                    <span class="hero-badge">情景故事生成</span>
-                    <span class="hero-badge">词汇记忆辅助</span>
-                </div>
+                <p>上传单词或实物照片，系统将自动提取核心词汇、生成情境故事与阅读练习，并通过 SRS 机制帮助你巩固记忆。</p>
             </div>
-            <div class="module-grid">
-                <div class="module-card accent-scenario">
-                    <span class="module-icon">🖼️</span>
-                    <div>
-                        <h3>图像识别</h3>
-                        <p>自动提取照片中的英文单词。</p>
-                    </div>
-                </div>
-                <div class="module-card accent-story">
-                    <span class="module-icon">📖</span>
-                    <div>
-                        <h3>情景故事</h3>
-                        <p>根据词汇构建连贯且易记的段落。</p>
-                    </div>
-                </div>
-                <div class="module-card accent-hint">
-                    <span class="module-icon">💡</span>
-                    <div>
-                        <h3>逐词提示</h3>
-                        <p>提供每个词的情景片段与用法线索。</p>
-                    </div>
-                </div>
-            </div>
+            <nav id="viewTabs" class="tab-nav" role="tablist">
+                <button type="button" data-route="home" class="is-active" role="tab" aria-selected="true">上传中心</button>
+                <button type="button" data-route="study" role="tab" aria-selected="false">学习页</button>
+                <button type="button" data-route="review" role="tab" aria-selected="false">复习页</button>
+            </nav>
         </header>
 
-        <main>
-            <section id="uploadPanel" class="panel upload-panel">
-                <div class="panel-header">
-                    <div>
-                        <h2>上传与生成</h2>
-                        <p>支持批量上传学习资料照片，可补充自定义词汇或情景提示，Gemini 将返回情景故事与逐词提示。</p>
-                    </div>
-                    <span id="uploadStatusFlag" class="status-flag">待开始</span>
-                </div>
-                <form id="uploadForm" class="form-grid" enctype="multipart/form-data">
-                    <div class="form-group form-group-full">
-                        <label for="wordImages">上传单词照片</label>
-                        <input type="file" id="wordImages" name="files" accept="image/*" multiple>
-                        <small class="form-tip">建议保持照片清晰、光线充足；如识别失败可在下方手动补充。</small>
-                    </div>
-                    <div class="form-group form-group-full">
-                        <label for="manualWords">手动补充词汇（可逗号或换行分隔）</label>
-                        <textarea id="manualWords" rows="3" placeholder="education, educator, anthropology..."></textarea>
-                    </div>
-                    <div class="form-group form-group-full">
-                        <label for="scenarioHint">情景提示（选填）</label>
-                        <input type="text" id="scenarioHint" placeholder="例如：校园迎新、研究所参观、职业规划会">
-                    </div>
-                    <div class="form-group form-group-full">
-                        <label for="geminiApiKey">Gemini API Key</label>
-                        <div class="api-key-control">
-                            <input type="password" id="geminiApiKey" placeholder="请输入 Gemini API Key" autocomplete="off" spellcheck="false">
-                            <label class="remember-key" for="rememberGeminiKey">
-                                <input type="checkbox" id="rememberGeminiKey">
-                                <span>在本地保存，下次自动填写</span>
-                            </label>
+        <main class="app-main">
+            <section id="viewHome" class="view view-active" data-view="home">
+                <div class="home-grid">
+                    <section class="panel upload-panel">
+                        <div class="panel-header">
+                            <h2>上传与生成</h2>
+                            <span id="uploadStatusBadge" class="badge">待开始</span>
                         </div>
-                        <small class="form-tip">仅保存在浏览器本地，用于调用 Gemini 生成情景素材。</small>
-                    </div>
-                    <div class="progress-wrapper" id="uploadProgressWrapper" style="display:none;">
-                        <div class="progress-bar"><span id="uploadProgressFill"></span></div>
-                        <span id="uploadProgressText">0%</span>
-                    </div>
-                    <div class="form-actions form-group-full">
-                        <button type="submit" id="uploadBtn">生成情景素材</button>
-                    </div>
-                    <div class="upload-feedback" id="uploadFeedback"></div>
-                </form>
-                <div id="uploadSummary" class="result-box" style="display:none;"></div>
+                        <p class="panel-subtitle">支持拖拽或选择上传，系统会在 2 秒内进入骨架屏生成状态。单张图片最大 10MB，仅支持 JPG / PNG。</p>
+                        <div id="uploadDropzone" class="upload-dropzone" role="button" tabindex="0" aria-label="上传学习图片">
+                            <div class="dropzone-icon">📤</div>
+                            <p>拖拽图片到此处，或
+                                <button type="button" id="pickFilesBtn">选择文件</button>
+                            </p>
+                            <p class="upload-tip">最多可同时上传 3 张图片，系统自动去重并生成学习会话。</p>
+                        </div>
+                        <input type="file" id="filePicker" accept="image/png,image/jpeg" multiple hidden>
+                        <div id="uploadProgressContainer" class="progress-container" aria-live="polite">
+                            <div class="progress-bar"><span id="uploadProgressFill"></span></div>
+                            <span id="uploadProgressText">0%</span>
+                        </div>
+                        <p id="uploadError" class="error-message" role="alert"></p>
+                        <div class="api-key-config">
+                            <label for="geminiApiKey">Gemini API Key</label>
+                            <div class="api-key-row">
+                                <input type="password" id="geminiApiKey" autocomplete="off" spellcheck="false" placeholder="输入 Gemini API Key">
+                                <label class="remember-key" for="rememberGeminiKey">
+                                    <input type="checkbox" id="rememberGeminiKey"> 记住
+                                </label>
+                            </div>
+                            <small class="upload-tip">密钥仅保存在本地浏览器，用于触发 Gemini 解析与生成。</small>
+                        </div>
+                    </section>
+
+                    <section class="panel recent-panel">
+                        <div class="panel-header">
+                            <h2>最近 10 张图片</h2>
+                            <span id="recentCount" class="badge">0</span>
+                        </div>
+                        <p class="panel-subtitle">上传后立即生成缩略图，便于快速回溯学习素材。</p>
+                        <div id="recentGrid" class="recent-grid" aria-live="polite"></div>
+                    </section>
+                </div>
             </section>
 
-            <section id="scenarioPanel" class="panel module-block accent-scenario-block">
-                <div class="panel-heading">
-                    <h2>情景片段展示</h2>
-                    <span id="scenarioStatus" class="status-pill">等待生成</span>
+            <section id="viewStudy" class="view" data-view="study" aria-hidden="true">
+                <div class="study-layout">
+                    <section class="panel image-panel">
+                        <div class="panel-header">
+                            <h2>原图预览</h2>
+                            <div class="badge" id="assetMeta">无图像</div>
+                        </div>
+                        <div class="image-toolbar">
+                            <div id="assetStrip" class="asset-strip" aria-label="图片列表"></div>
+                            <div id="zoomControls" class="zoom-controls" aria-label="缩放控制">
+                                <button type="button" data-zoom="out" aria-label="缩小">−</button>
+                                <button type="button" data-zoom="reset" aria-label="重置">⟳</button>
+                                <button type="button" data-zoom="in" aria-label="放大">＋</button>
+                            </div>
+                        </div>
+                        <div class="image-viewer">
+                            <div id="imageViewport" class="image-viewport">
+                                <div id="imageStage" class="image-stage">
+                                    <img id="studyImage" src="" alt="学习原图" hidden>
+                                    <div id="bboxLayer" class="bbox-layer"></div>
+                                </div>
+                                <div id="imagePlaceholder" class="image-placeholder">上传后将在此显示原图与词框。</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="panel detail-panel">
+                        <div class="panel-section word-section">
+                            <div class="panel-header">
+                                <h2>词卡列表</h2>
+                                <span id="wordCountBadge" class="badge">0</span>
+                            </div>
+                            <div id="wordCardList" class="word-list" aria-live="polite"></div>
+                        </div>
+                        <div class="panel-section reading-section">
+                            <div class="panel-header">
+                                <h2>阅读填空</h2>
+                                <span id="readingStatus" class="badge">未生成</span>
+                            </div>
+                            <div id="readingQuiz" class="reading-quiz" aria-live="polite"></div>
+                        </div>
+                    </section>
                 </div>
-                <div id="scenarioContent" class="module-content">
-                    <p class="placeholder">上传单词照片后，将自动生成情景故事和逐词提示。</p>
-                </div>
+            </section>
+
+            <section id="viewReview" class="view" data-view="review" aria-hidden="true">
+                <section class="panel review-panel">
+                    <div class="panel-header">
+                        <h2>SRS 复习清单</h2>
+                        <span id="reviewSummary" class="badge">今日 0 / 累积 0</span>
+                    </div>
+                    <p class="panel-subtitle">采用 0–5 级记忆曲线，对应复习间隔 [1d, 3d, 7d, 14d, 30d]，数据持久化于本地。</p>
+                    <div id="reviewList" class="review-list" aria-live="polite"></div>
+                    <p id="reviewOverflow" class="panel-note"></p>
+                </section>
             </section>
         </main>
     </div>
@@ -108,309 +132,5 @@
     <script src="../../models.js"></script>
     <script src="../../usage.js"></script>
     <script src="./script.js"></script>
-    <style>
-        body.ielts-theme {
-            background: #f5f7ff;
-        }
-        .hero {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 28px;
-            padding: 32px;
-            margin-bottom: 32px;
-            border-radius: 24px;
-            background: linear-gradient(135deg, #4f5fff 0%, #7f8dff 40%, #f2f3ff 100%);
-            color: #fff;
-        }
-        .hero-copy .back-link {
-            color: rgba(255, 255, 255, 0.9);
-            font-weight: 500;
-            margin-bottom: 12px;
-            display: inline-block;
-        }
-        .hero h1 {
-            font-size: 2.2rem;
-            margin-bottom: 12px;
-        }
-        .hero .intro {
-            max-width: 520px;
-            line-height: 1.6;
-            margin-bottom: 16px;
-        }
-        .hero-badges {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .hero-badge {
-            padding: 6px 14px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.18);
-            backdrop-filter: blur(6px);
-            font-size: 0.85rem;
-        }
-        .module-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 12px;
-        }
-        .module-card {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 16px;
-            border-radius: 18px;
-            color: #1f1f3d;
-            background: rgba(255, 255, 255, 0.92);
-            box-shadow: 0 10px 24px rgba(30, 42, 200, 0.16);
-        }
-        .module-card h3 {
-            margin: 0 0 6px;
-            font-size: 1.1rem;
-        }
-        .module-card p {
-            margin: 0;
-            font-size: 0.85rem;
-            color: rgba(31, 31, 61, 0.7);
-        }
-        .module-icon {
-            font-size: 1.8rem;
-        }
-        .accent-scenario { background: linear-gradient(135deg, #e5e9ff, #f5f7ff); }
-        .accent-story { background: linear-gradient(135deg, #fff1f6, #fff6fa); }
-        .accent-hint { background: linear-gradient(135deg, #e5fff4, #f5fffb); }
-        .upload-panel {
-            background: #fff;
-            border-radius: 18px;
-            box-shadow: 0 18px 36px rgba(79, 95, 255, 0.08);
-            padding: 28px;
-        }
-        .panel-header {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 16px;
-            margin-bottom: 16px;
-        }
-        .panel-header p {
-            margin-top: 6px;
-            color: #4a4f75;
-        }
-        .status-flag {
-            padding: 6px 14px;
-            border-radius: 999px;
-            background: #f0f1ff;
-            color: #2f3dbf;
-            font-weight: 600;
-            font-size: 0.85rem;
-        }
-        .status-flag.loading { background: #eef2ff; color: #3142c6; }
-        .status-flag.success { background: #d7f5e0; color: #0f8d3a; }
-        .status-flag.error { background: #fde2e1; color: #d93025; }
-        .form-grid {
-            display: grid;
-            gap: 16px;
-        }
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .form-group-full {
-            grid-column: 1 / -1;
-        }
-        .form-group label {
-            font-weight: 600;
-            color: #2f3d63;
-        }
-        .form-group input,
-        .form-group textarea {
-            width: 100%;
-            border: 1px solid #cbd5f5;
-            border-radius: 8px;
-            padding: 10px 12px;
-            font-size: 0.95rem;
-        }
-        .form-tip {
-            font-size: 0.85rem;
-            color: #6670a0;
-        }
-        .api-key-control {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .remember-key {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.9rem;
-            color: #4a4f75;
-            cursor: pointer;
-            user-select: none;
-        }
-        .remember-key input {
-            width: 16px;
-            height: 16px;
-        }
-        .form-actions button {
-            padding: 12px 24px;
-            border-radius: 12px;
-            border: none;
-            background: linear-gradient(135deg, #4f5fff, #7a8aff);
-            color: #fff;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.1s ease, box-shadow 0.2s ease;
-        }
-        .form-actions button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 12px 20px rgba(79, 95, 255, 0.18);
-        }
-        .progress-wrapper {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin: 10px 0;
-        }
-        .progress-bar {
-            flex: 1;
-            height: 8px;
-            border-radius: 999px;
-            background: #e5e7ff;
-            overflow: hidden;
-        }
-        .progress-bar span {
-            display: block;
-            width: 0%;
-            height: 100%;
-            background: linear-gradient(90deg, #4f5fff, #7a8aff);
-            transition: width 0.3s ease;
-        }
-        .upload-feedback {
-            margin-top: 8px;
-            min-height: 20px;
-            font-size: 0.9rem;
-            color: #2f3dbf;
-        }
-        .upload-feedback.error {
-            color: #d93025;
-        }
-        .upload-feedback.success {
-            color: #0f8d3a;
-        }
-        .module-block {
-            border-radius: 18px;
-            padding: 24px;
-            margin-top: 28px;
-            background: #fff;
-            box-shadow: 0 18px 36px rgba(79, 95, 255, 0.08);
-        }
-        .accent-scenario-block {
-            background: linear-gradient(135deg, #f3f5ff, #ffffff);
-        }
-        .module-block .panel-heading {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 16px;
-        }
-        .status-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 12px;
-            border-radius: 999px;
-            font-size: 0.85rem;
-            background: #eef2ff;
-            color: #3142c6;
-        }
-        .status-pill.ready { background: #d7f5e0; color: #0f8d3a; }
-        .status-pill.waiting { background: #f4f4f5; color: #4a4a4a; }
-        .status-pill.error { background: #fde2e1; color: #d93025; }
-        .status-pill.loading::after {
-            content: "";
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: currentColor;
-            animation: pulse 1s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 0.2; }
-            50% { opacity: 1; }
-        }
-        .module-content .placeholder {
-            color: #666;
-            padding: 12px 0;
-        }
-        .session-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 12px;
-            background: #f2f7ff;
-            border-radius: 12px;
-            font-size: 0.85rem;
-            color: #2643a1;
-        }
-        .word-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin: 12px 0;
-        }
-        .word-chip {
-            padding: 4px 10px;
-            border-radius: 999px;
-            background: #f7fafc;
-            border: 1px solid #d6e4ff;
-            font-size: 0.9rem;
-        }
-        .meta-note {
-            font-size: 0.85rem;
-            color: #4a4f75;
-            margin-top: 6px;
-        }
-        .meta-note li {
-            margin-top: 4px;
-        }
-        .story-block {
-            display: grid;
-            gap: 10px;
-            padding: 16px;
-            border-radius: 16px;
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(79, 95, 255, 0.12);
-        }
-        .story-overview {
-            color: #3a4374;
-        }
-        .segment-list {
-            margin-top: 16px;
-            display: grid;
-            gap: 10px;
-        }
-        .segment-item {
-            padding: 12px 14px;
-            border-radius: 12px;
-            background: #f9fafb;
-            border: 1px solid #e2e8f0;
-            font-size: 0.95rem;
-            color: #2f3d63;
-        }
-        .segment-item strong {
-            display: block;
-            margin-bottom: 6px;
-        }
-        @media (max-width: 768px) {
-            .hero {
-                padding: 24px;
-            }
-            .module-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-        }
-    </style>
 </body>
 </html>
