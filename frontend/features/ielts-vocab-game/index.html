@@ -343,6 +343,84 @@
             gap: 18px;
         }
 
+        .word-detail {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 16px;
+            padding: 14px 18px;
+            border-radius: 18px;
+            background: rgba(56, 189, 248, 0.14);
+            border: 1px solid rgba(148, 163, 255, 0.25);
+        }
+
+        .word-detail.hidden {
+            display: none;
+        }
+
+        .word-detail .word-core {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+        }
+
+        .word-detail .keyword {
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+
+        .word-detail .phonetic {
+            font-size: 1rem;
+            color: rgba(226, 232, 255, 0.82);
+            font-family: 'Roboto', 'Segoe UI', sans-serif;
+        }
+
+        .word-detail .translation {
+            color: rgba(226, 232, 255, 0.8);
+            font-size: 0.98rem;
+        }
+
+        .word-detail .word-aux {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .word-audio-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 255, 0.38);
+            background: rgba(15, 23, 42, 0.6);
+            color: rgba(226, 232, 255, 0.92);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.2s ease, border 0.2s ease;
+        }
+
+        .word-audio-btn:hover:not(:disabled) {
+            background: rgba(56, 189, 248, 0.24);
+            border-color: rgba(56, 189, 248, 0.6);
+            transform: translateY(-1px);
+        }
+
+        .word-audio-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .is-hidden {
+            display: none !important;
+        }
+
+        .word-inline {
+            color: rgba(226, 232, 255, 0.78);
+            font-weight: 500;
+        }
+
         .question-meta {
             display: flex;
             justify-content: space-between;
@@ -720,6 +798,18 @@
                     <span id="timerValue" class="timer">--</span>
                 </div>
                 <h2 id="promptText">准备好进入雅思词汇对战了吗？点击「启动 Session」开始挑战。</h2>
+                <div id="wordDetail" class="word-detail hidden" aria-live="polite">
+                    <div class="word-core">
+                        <span id="wordKeyword" class="keyword">—</span>
+                        <span id="wordPhonetic" class="phonetic is-hidden"></span>
+                    </div>
+                    <div class="word-aux">
+                        <span id="wordTranslation" class="translation is-hidden"></span>
+                        <button id="wordAudioBtn" type="button" class="word-audio-btn" aria-label="播放单词发音" disabled>
+                            🔊 <span>发音</span>
+                        </button>
+                    </div>
+                </div>
                 <div id="optionsGrid" class="options-grid">
                     <div class="option-card locked">
                         <span class="key">A</span>

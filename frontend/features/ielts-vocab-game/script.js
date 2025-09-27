@@ -27,10 +27,16 @@ const state = {
 };
 
 const elements = {};
+const speech = {
+    supported: typeof window !== 'undefined' && 'speechSynthesis' in window,
+    voices: [],
+    preferredVoice: null,
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     cacheElements();
     bindEvents();
+    initializeSpeechEngine();
     renderFeedbackPlaceholder('启动 Session 后，AI Navigator 会即时解析你的答案。');
     resetInterface();
     loadConfig();
@@ -51,6 +57,11 @@ function cacheElements() {
     elements.questionTypeBadge = document.getElementById('questionTypeBadge');
     elements.timerValue = document.getElementById('timerValue');
     elements.promptText = document.getElementById('promptText');
+    elements.wordDetail = document.getElementById('wordDetail');
+    elements.wordKeyword = document.getElementById('wordKeyword');
+    elements.wordPhonetic = document.getElementById('wordPhonetic');
+    elements.wordTranslation = document.getElementById('wordTranslation');
+    elements.wordAudioBtn = document.getElementById('wordAudioBtn');
     elements.optionsGrid = document.getElementById('optionsGrid');
     elements.nextButton = document.getElementById('nextButton');
     elements.feedbackPanel = document.getElementById('feedbackPanel');
@@ -62,6 +73,9 @@ function cacheElements() {
 function bindEvents() {
     elements.startSessionBtn.addEventListener('click', startSession);
     elements.resetSessionBtn.addEventListener('click', () => resetInterface(true));
+    if (elements.wordAudioBtn) {
+        elements.wordAudioBtn.addEventListener('click', handleWordAudioPlayback);
+    }
     elements.nextButton.addEventListener('click', () => {
         if (!state.sessionActive) {
             return;
@@ -196,6 +210,7 @@ function resetInterface(showCoach = false) {
     elements.questionTypeBadge.textContent = '等待启动';
     elements.timerValue.textContent = '--';
     elements.promptText.textContent = '准备好进入雅思词汇对战了吗？点击「启动 Session」开始挑战。';
+    renderWordReference(null);
     elements.optionsGrid.innerHTML = '';
     const placeholder = document.createElement('div');
     placeholder.className = 'option-card locked';
@@ -326,6 +341,7 @@ function renderRound() {
     const { questionType, prompt, options, skillFocus } = state.activeRound;
     elements.questionTypeBadge.textContent = `${QUESTION_LABELS[questionType] || '挑战'} · ${skillFocus ?? ''}`;
     elements.promptText.textContent = prompt;
+    renderWordReference(state.activeRound.supporting);
     elements.optionsGrid.innerHTML = '';
 
     options.forEach((option, index) => {
@@ -346,6 +362,58 @@ function renderRound() {
         button.addEventListener('click', () => handleOptionSelect(option.id, button));
         elements.optionsGrid.appendChild(button);
     });
+}
+
+function renderWordReference(supporting) {
+    if (!elements.wordDetail) {
+        return;
+    }
+    if (!supporting?.keyword) {
+        elements.wordDetail.classList.add('hidden');
+        if (elements.wordKeyword) {
+            elements.wordKeyword.textContent = '—';
+        }
+        if (elements.wordPhonetic) {
+            elements.wordPhonetic.textContent = '';
+            elements.wordPhonetic.classList.add('is-hidden');
+        }
+        if (elements.wordTranslation) {
+            elements.wordTranslation.textContent = '';
+            elements.wordTranslation.classList.add('is-hidden');
+        }
+        if (elements.wordAudioBtn) {
+            elements.wordAudioBtn.disabled = true;
+            elements.wordAudioBtn.removeAttribute('data-word');
+            elements.wordAudioBtn.title = speech.supported ? '等待下一题解锁发音' : '当前浏览器不支持语音播放';
+        }
+        return;
+    }
+
+    if (elements.wordKeyword) {
+        elements.wordKeyword.textContent = supporting.keyword;
+    }
+    if (elements.wordPhonetic) {
+        const phonetic = supporting.phonetic ? `/${supporting.phonetic}/` : '';
+        elements.wordPhonetic.textContent = phonetic;
+        elements.wordPhonetic.classList.toggle('is-hidden', !supporting.phonetic);
+    }
+    if (elements.wordTranslation) {
+        elements.wordTranslation.textContent = supporting.translation || '';
+        elements.wordTranslation.classList.toggle('is-hidden', !supporting.translation);
+    }
+    if (elements.wordAudioBtn) {
+        const playable = speech.supported && Boolean(supporting.keyword);
+        elements.wordAudioBtn.disabled = !playable;
+        if (playable) {
+            elements.wordAudioBtn.dataset.word = supporting.keyword;
+            elements.wordAudioBtn.title = `播放 ${supporting.keyword} 的发音`;
+        } else {
+            elements.wordAudioBtn.removeAttribute('data-word');
+            elements.wordAudioBtn.title = speech.supported ? '当前浏览器支持语音播放，但暂无可播放单词' : '当前浏览器不支持语音播放';
+        }
+    }
+
+    elements.wordDetail.classList.remove('hidden');
 }
 
 function handleOptionSelect(optionId, button) {
@@ -451,19 +519,83 @@ function highlightOptions(correctId, selectedId, outcome) {
     });
 }
 
+function initializeSpeechEngine() {
+    if (!speech.supported) {
+        if (elements.wordAudioBtn) {
+            elements.wordAudioBtn.disabled = true;
+            elements.wordAudioBtn.title = '当前浏览器不支持语音播放';
+        }
+        return;
+    }
+
+    const updateVoices = () => {
+        speech.voices = window.speechSynthesis.getVoices();
+        speech.preferredVoice = (
+            speech.voices.find(voice => voice.lang?.toLowerCase().startsWith('en-gb')) ||
+            speech.voices.find(voice => voice.lang?.toLowerCase().startsWith('en-us')) ||
+            speech.voices.find(voice => voice.lang?.toLowerCase().startsWith('en')) ||
+            speech.voices[0] ||
+            null
+        );
+    };
+
+    updateVoices();
+    window.speechSynthesis.addEventListener('voiceschanged', updateVoices);
+}
+
+function handleWordAudioPlayback() {
+    if (!speech.supported || !elements.wordAudioBtn) {
+        return;
+    }
+    const word = elements.wordAudioBtn.dataset.word;
+    if (!word) {
+        return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(word);
+    const voice = speech.preferredVoice || window.speechSynthesis.getVoices().find(v => v.lang?.startsWith('en')) || null;
+    if (voice) {
+        utterance.voice = voice;
+        utterance.lang = voice.lang;
+    } else {
+        utterance.lang = 'en-US';
+    }
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+}
+
 function renderFeedback(result) {
     if (!elements.feedbackPanel) {
         return;
     }
-    const { detail, feedback, scoreDelta, outcome, correct } = result;
+    const detail = result.detail ?? {};
+    const feedbackInfo = result.feedback ?? {};
+    const { scoreDelta = 0, outcome, correct } = result;
     const statusLabel = correct ? '✅ 正确' : outcome === 'timeout' ? '⌛ 超时' : '❌ 再接再厉';
     const deltaLabel = scoreDelta >= 0 ? `+${scoreDelta}` : `${scoreDelta}`;
     const synonyms = detail.synonyms?.length ? detail.synonyms.join(' · ') : '—';
     const collocations = detail.collocations?.length ? detail.collocations.join(' / ') : '—';
 
     const bodyLines = [];
+    const descriptors = [];
+    if (detail.phonetic) {
+        descriptors.push(`/${detail.phonetic}/`);
+    }
+    if (detail.translation) {
+        descriptors.push(detail.translation);
+    }
     if (detail.definition) {
-        bodyLines.push(`<p><strong>${detail.word}</strong> · ${detail.definition}</p>`);
+        const meta = descriptors.length ? `<span class="word-inline">${descriptors.join(' · ')}</span>` : '';
+        const metaSuffix = meta ? ` ${meta}` : '';
+        bodyLines.push(`<p><strong>${detail.word}</strong>${metaSuffix} · ${detail.definition}</p>`);
+    } else if (detail.word) {
+        const inlineMeta = descriptors.length ? ` · ${descriptors.join(' · ')}` : '';
+        bodyLines.push(`<p><strong>${detail.word}</strong>${inlineMeta}</p>`);
+    } else if (descriptors.length) {
+        bodyLines.push(`<p>${descriptors.join(' · ')}</p>`);
     }
     if (detail.example) {
         bodyLines.push(`<p>Example: ${detail.example}</p>`);
@@ -481,9 +613,9 @@ function renderFeedback(result) {
                 <span class="pill">Collocations: ${collocations}</span>
                 ${detail.usageTip ? `<span class="pill">Usage Tip: ${detail.usageTip}</span>` : ''}
             </div>
-            <p>${feedback.summary}</p>
-            <p><strong>Next:</strong> ${feedback.nextStep}</p>
-            <p><strong>AI Hint:</strong> ${feedback.microHint}</p>
+            <p>${feedbackInfo.summary ?? ''}</p>
+            <p><strong>Next:</strong> ${feedbackInfo.nextStep ?? ''}</p>
+            <p><strong>AI Hint:</strong> ${feedbackInfo.microHint ?? ''}</p>
         </div>
     `;
 }
@@ -626,6 +758,14 @@ function updateCoachPanel(insight, supporting) {
 
     if (supporting?.quickTip) {
         lines.push(`<div class="tip-line">提示：${supporting.quickTip}</div>`);
+    }
+
+    if (supporting?.translation) {
+        lines.push(`<div class="tip-line">中文：${supporting.translation}</div>`);
+    }
+
+    if (supporting?.phonetic) {
+        lines.push(`<div class="tip-line">音标：/${supporting.phonetic}/</div>`);
     }
 
     if (supporting?.collocations?.length) {
