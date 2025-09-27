@@ -60,6 +60,12 @@ const FEATURES = [
         isFullPath: true
     },
     {
+        path: 'ielts-vocab-game/index.html',
+        name: '🛰️ IELTS 词汇能量舱',
+        description: '成人向雅思词汇学习对战，覆盖多难度与多题型的沉浸式训练体验。',
+        isFullPath: true
+    },
+    {
         path: 'chess-academy/index.html',
         name: '♟️ 星空儿童国际象棋学院',
         description: '面向小学生的国际象棋学习和对弈模块，包含智能棋友、友好提示与每日谜题。',

@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛰️ IELTS 词汇能量舱</title>
+    <link rel="stylesheet" href="../../style.css">
+    <style>
+        :root {
+            --vocab-bg: radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.18), transparent 55%),
+                         radial-gradient(circle at 80% 0%, rgba(168, 85, 247, 0.14), transparent 60%),
+                         linear-gradient(180deg, #050b18 0%, #0b1226 42%, #050b18 100%);
+            --card-surface: rgba(11, 18, 38, 0.72);
+            --card-border: rgba(148, 163, 255, 0.18);
+            --text-primary: #ecf2ff;
+            --text-secondary: rgba(226, 232, 255, 0.75);
+            --chip-active: linear-gradient(135deg, #38bdf8, #8b5cf6);
+            --chip-muted: rgba(148, 163, 255, 0.12);
+            --success: #34d399;
+            --danger: #f87171;
+            --warning: #fbbf24;
+        }
+
+        body.vocab-body {
+            min-height: 100vh;
+            background: var(--vocab-bg);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            padding: 32px 0 80px;
+        }
+
+        .vocab-shell {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 32px;
+            padding: 32px;
+            border-radius: 28px;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.25), rgba(129, 140, 248, 0.18));
+            border: 1px solid rgba(148, 163, 255, 0.3);
+            box-shadow: 0 32px 70px rgba(15, 23, 42, 0.38);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            inset: -120px;
+            background: radial-gradient(circle at 70% 10%, rgba(59, 130, 246, 0.35), transparent 55%);
+            filter: blur(60px);
+            z-index: 0;
+        }
+
+        .hero > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 999px;
+            background: rgba(56, 189, 248, 0.16);
+            color: rgba(224, 242, 254, 0.92);
+            font-weight: 600;
+            font-size: 0.92rem;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+
+        .hero h1 {
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            margin: 18px 0 12px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+
+        .hero p {
+            margin: 0;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .hero-highlights {
+            margin: 22px 0 0;
+            padding-left: 20px;
+            color: rgba(226, 232, 255, 0.78);
+            display: grid;
+            gap: 8px;
+            list-style: none;
+        }
+
+        .hero-highlights li::before {
+            content: '✦';
+            margin-right: 10px;
+            color: #38bdf8;
+        }
+
+        .hero-status-card {
+            align-self: center;
+            background: rgba(15, 23, 42, 0.55);
+            border: 1px solid rgba(148, 163, 255, 0.18);
+            border-radius: 20px;
+            padding: 20px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-height: 200px;
+        }
+
+        .hero-status-card h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0;
+            color: rgba(224, 242, 254, 0.88);
+        }
+
+        .hero-status-card p {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+        }
+
+        .panel-card {
+            background: var(--card-surface);
+            border-radius: 22px;
+            padding: 20px 22px;
+            border: 1px solid var(--card-border);
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.45);
+        }
+
+        .panel-card h3 {
+            margin: 0 0 14px;
+            font-size: 1.05rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+        }
+
+        .chip-row,
+        .mode-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .chip,
+        .mode-chip {
+            padding: 10px 16px;
+            border-radius: 999px;
+            background: var(--chip-muted);
+            border: 1px solid rgba(148, 163, 255, 0.25);
+            color: var(--text-secondary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+        }
+
+        .chip strong,
+        .mode-chip strong {
+            display: block;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .chip small,
+        .mode-chip small {
+            display: block;
+            font-size: 0.72rem;
+            opacity: 0.78;
+            margin-top: 2px;
+        }
+
+        .chip.active,
+        .mode-chip.active {
+            background: var(--chip-active);
+            color: white;
+            box-shadow: 0 12px 28px rgba(99, 102, 241, 0.35);
+            transform: translateY(-2px);
+        }
+
+        .chip:hover,
+        .mode-chip:hover {
+            transform: translateY(-1px);
+        }
+
+        .session-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .session-controls label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .session-controls select {
+            background: rgba(15, 23, 42, 0.65);
+            color: var(--text-primary);
+            border: 1px solid rgba(148, 163, 255, 0.28);
+            padding: 10px 14px;
+            border-radius: 12px;
+        }
+
+        .session-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .session-actions button {
+            flex: 1 1 140px;
+            border-radius: 14px;
+            border: none;
+            padding: 12px 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        #startSessionBtn {
+            background: linear-gradient(135deg, #38bdf8, #22d3ee);
+            color: #041423;
+            box-shadow: 0 15px 30px rgba(34, 211, 238, 0.35);
+        }
+
+        #resetSessionBtn {
+            background: rgba(15, 23, 42, 0.7);
+            color: var(--text-secondary);
+            border: 1px solid rgba(148, 163, 255, 0.2);
+        }
+
+        .session-actions button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .coach-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .coach-panel .mantra {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: rgba(224, 242, 254, 0.9);
+        }
+
+        .coach-panel .tip-line {
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 18px;
+        }
+
+        .metric-card {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 20px;
+            padding: 18px 20px;
+            border: 1px solid rgba(148, 163, 255, 0.24);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .metric-card .label {
+            font-size: 0.86rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(148, 163, 255, 0.7);
+        }
+
+        .metric-card .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .metric-card .meta {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .progress-bar {
+            margin-top: 8px;
+            width: 100%;
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(71, 85, 105, 0.55);
+            overflow: hidden;
+        }
+
+        .progress-bar span {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, #38bdf8, #8b5cf6);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .game-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+            gap: 22px;
+            align-items: start;
+        }
+
+        .question-card {
+            background: rgba(15, 23, 42, 0.68);
+            border-radius: 26px;
+            padding: 24px;
+            border: 1px solid rgba(148, 163, 255, 0.25);
+            box-shadow: 0 25px 55px rgba(10, 12, 26, 0.55);
+            min-height: 360px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .question-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(56, 189, 248, 0.2);
+            font-weight: 600;
+            letter-spacing: 0.04em;
+        }
+
+        .timer {
+            font-family: 'Roboto Mono', monospace;
+            color: rgba(248, 250, 252, 0.85);
+            font-size: 0.95rem;
+        }
+
+        #promptText {
+            font-size: 1.2rem;
+            line-height: 1.7;
+            color: rgba(226, 232, 255, 0.95);
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+        }
+
+        .options-grid.loading {
+            opacity: 0.6;
+        }
+
+        .option-card {
+            padding: 16px 18px;
+            border-radius: 18px;
+            border: 1px solid rgba(148, 163, 255, 0.22);
+            background: rgba(15, 23, 42, 0.52);
+            color: rgba(226, 232, 255, 0.92);
+            text-align: left;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            cursor: pointer;
+            transition: transform 0.15s ease, border 0.15s ease, background 0.15s ease;
+            position: relative;
+        }
+
+        .option-card span.key {
+            font-weight: 700;
+            color: rgba(191, 219, 254, 0.85);
+            font-size: 1.05rem;
+        }
+
+        .option-card .text {
+            flex: 1;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .option-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(59, 130, 246, 0.55);
+        }
+
+        .option-card.locked {
+            cursor: default;
+            opacity: 0.85;
+        }
+
+        .option-card.selected {
+            border-color: rgba(59, 130, 246, 0.55);
+            transform: translateY(-1px);
+        }
+
+        .option-card.correct {
+            border-color: rgba(52, 211, 153, 0.9);
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(14, 165, 233, 0.12));
+        }
+
+        .option-card.incorrect {
+            border-color: rgba(248, 113, 113, 0.85);
+            background: linear-gradient(135deg, rgba(248, 113, 113, 0.18), rgba(79, 70, 229, 0.08));
+        }
+
+        .option-card.timeout::after {
+            content: 'TIME';
+            position: absolute;
+            top: 10px;
+            right: 14px;
+            font-size: 0.7rem;
+            letter-spacing: 0.2em;
+            color: rgba(248, 250, 252, 0.6);
+        }
+
+        .question-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: auto;
+        }
+
+        #nextButton {
+            padding: 10px 18px;
+            border-radius: 12px;
+            border: none;
+            background: rgba(59, 130, 246, 0.25);
+            color: rgba(226, 232, 255, 0.88);
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+        }
+
+        #nextButton:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .feedback-surface {
+            background: rgba(15, 23, 42, 0.55);
+            border-radius: 24px;
+            padding: 20px 22px;
+            border: 1px solid rgba(148, 163, 255, 0.22);
+            box-shadow: 0 20px 50px rgba(8, 11, 24, 0.55);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            min-height: 320px;
+        }
+
+        .feedback-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .feedback-header .status {
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .feedback-header .delta {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+        }
+
+        .feedback-body {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            font-size: 0.92rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .feedback-body strong {
+            color: rgba(224, 242, 254, 0.92);
+        }
+
+        .feedback-grid {
+            display: grid;
+            gap: 10px;
+        }
+
+        .feedback-grid .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(59, 130, 246, 0.18);
+            color: rgba(226, 232, 255, 0.85);
+            font-size: 0.82rem;
+        }
+
+        .summary-panel {
+            background: rgba(15, 23, 42, 0.62);
+            border-radius: 22px;
+            border: 1px solid rgba(148, 163, 255, 0.2);
+            padding: 20px 24px;
+            display: none;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .summary-panel.active {
+            display: flex;
+        }
+
+        .summary-panel h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+        }
+
+        .summary-grid .box {
+            background: rgba(59, 130, 246, 0.12);
+            border-radius: 16px;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .timeline-card {
+            background: rgba(15, 23, 42, 0.58);
+            border-radius: 24px;
+            padding: 20px 24px;
+            border: 1px solid rgba(148, 163, 255, 0.2);
+            box-shadow: 0 18px 45px rgba(10, 12, 28, 0.5);
+        }
+
+        .timeline-card h3 {
+            margin: 0 0 14px;
+        }
+
+        #timelineList {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            gap: 12px;
+        }
+
+        .timeline-item {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 16px;
+            padding: 12px 14px;
+            border: 1px solid rgba(148, 163, 255, 0.18);
+            display: grid;
+            gap: 6px;
+        }
+
+        .timeline-item .title {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            font-weight: 600;
+        }
+
+        .timeline-item .title span.status {
+            font-size: 0.8rem;
+            letter-spacing: 0.1em;
+        }
+
+        .timeline-item .detail {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .vocab-footer {
+            text-align: center;
+            color: rgba(148, 163, 255, 0.7);
+            font-size: 0.92rem;
+        }
+
+        .vocab-footer a {
+            color: rgba(129, 178, 255, 0.9);
+            text-decoration: none;
+        }
+
+        @media (max-width: 900px) {
+            .game-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body.vocab-body {
+                padding: 20px 0 60px;
+            }
+            .hero {
+                padding: 26px;
+            }
+            .panel-card {
+                padding: 18px 18px;
+            }
+            .question-card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body class="vocab-body">
+    <div class="vocab-shell">
+        <header class="hero">
+            <div>
+                <div class="hero-badge">IELTS Vocabulary Reactor</div>
+                <h1>🛰️ IELTS 词汇能量舱</h1>
+                <p>
+                    面向成年学习者的高阶雅思词汇训练模块。通过多难度、多题型的动态关卡，配合 AI Navigator
+                    即时反馈，让你在有限时间内完成高效率的词汇巩固与迁移演练。
+                </p>
+                <ul class="hero-highlights">
+                    <li>难度自适应：Foundation / Advanced / Expert</li>
+                    <li>三大题型轮换：释义对决、同义词映射、语境填空</li>
+                    <li>AI Navigator 生成个性化语料与下一步行动建议</li>
+                </ul>
+            </div>
+            <aside class="hero-status-card">
+                <h2>学习建议</h2>
+                <p>建议采用 6~10 题短打卡，逐步提升至 15 题实战演练。保持专注，一次只聚焦一个难度层级。</p>
+                <p>若你是初学者，请从 Foundation 开始，熟悉常见搭配后再切换至 Advanced。</p>
+            </aside>
+        </header>
+
+        <section class="control-grid">
+            <article class="panel-card">
+                <h3>难度轨道</h3>
+                <div id="difficultyChips" class="chip-row"></div>
+            </article>
+            <article class="panel-card">
+                <h3>题型矩阵</h3>
+                <div id="modeChips" class="mode-row"></div>
+            </article>
+            <article class="panel-card">
+                <h3>Session 控制台</h3>
+                <div class="session-controls">
+                    <label for="sessionLengthSelect">本轮挑战题量</label>
+                    <select id="sessionLengthSelect"></select>
+                    <div class="session-actions">
+                        <button id="startSessionBtn">启动 Session</button>
+                        <button id="resetSessionBtn" type="button">重置界面</button>
+                    </div>
+                </div>
+            </article>
+            <article class="panel-card coach-panel">
+                <h3>AI Navigator</h3>
+                <div id="aiTip" class="tip-line">加载个性化建议中...</div>
+            </article>
+        </section>
+
+        <section class="status-grid">
+            <div class="metric-card">
+                <span class="label">Score</span>
+                <span id="scoreValue" class="value">0</span>
+                <span id="scoreMeta" class="meta">准备就绪</span>
+            </div>
+            <div class="metric-card">
+                <span class="label">Accuracy</span>
+                <span id="accuracyValue" class="value">0%</span>
+                <span class="meta">正确率</span>
+            </div>
+            <div class="metric-card">
+                <span class="label">Streak</span>
+                <span id="streakValue" class="value">0</span>
+                <span class="meta">连续答对题数</span>
+            </div>
+            <div class="metric-card">
+                <span class="label">Progress</span>
+                <span id="progressValue" class="value">0/0</span>
+                <span class="meta">完成题数</span>
+                <div class="progress-bar"><span id="progressBar"></span></div>
+            </div>
+        </section>
+
+        <section class="game-grid">
+            <article class="question-card">
+                <div class="question-meta">
+                    <span id="questionTypeBadge" class="badge">等待启动</span>
+                    <span id="timerValue" class="timer">--</span>
+                </div>
+                <h2 id="promptText">准备好进入雅思词汇对战了吗？点击「启动 Session」开始挑战。</h2>
+                <div id="optionsGrid" class="options-grid">
+                    <div class="option-card locked">
+                        <span class="key">A</span>
+                        <span class="text">题目加载后，这里将出现高频 IELTS 词汇相关选项。</span>
+                    </div>
+                </div>
+                <div class="question-actions">
+                    <button id="nextButton" type="button" disabled>下一题</button>
+                </div>
+            </article>
+            <aside class="feedback-surface" id="feedbackPanel">
+                <div class="feedback-header">
+                    <span class="status">等待作答</span>
+                    <span class="delta">Score Δ --</span>
+                </div>
+                <div class="feedback-body">
+                    <p>当你提交答案后，这里会展示正确解析、常见搭配及 AI 给出的下一步建议。</p>
+                    <div class="feedback-grid">
+                        <span class="pill">Synonyms · Collocations · Usage Tips</span>
+                    </div>
+                </div>
+            </aside>
+        </section>
+
+        <section class="summary-panel" id="sessionSummary"></section>
+
+        <section class="timeline-card">
+            <h3>学习轨迹</h3>
+            <ul id="timelineList">
+                <li class="timeline-item">
+                    <div class="title">
+                        <span>暂未开始</span>
+                        <span class="status">--</span>
+                    </div>
+                    <div class="detail">启动 Session 后，这里会记录每一题的表现与复盘要点。</div>
+                </li>
+            </ul>
+        </section>
+
+        <footer class="vocab-footer">
+            <a href="../../dashboard.html">← 返回功能中心</a>
+        </footer>
+    </div>
+
+    <script src="../../config.js"></script>
+    <script src="../../auth.js"></script>
+    <script src="../../models.js"></script>
+    <script src="../../usage.js"></script>
+    <script src="./script.js"></script>
+</body>
+</html>
