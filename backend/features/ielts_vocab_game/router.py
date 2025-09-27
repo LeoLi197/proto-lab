@@ -131,6 +131,8 @@ GAME_MODES: Dict[str, Dict[str, Any]] = {
 IELTS_VOCABULARY: List[Dict[str, Any]] = [
     {
         "word": "analyze",
+        "phonetic": "ˈænəˌlaɪz",
+        "translation": "分析",
         "difficulty": "foundation",
         "definition": "to examine something in detail in order to explain or understand it",
         "synonyms": ["examine", "evaluate", "study"],
@@ -140,6 +142,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "beneficial",
+        "phonetic": "ˌbenəˈfɪʃəl",
+        "translation": "有益的",
         "difficulty": "foundation",
         "definition": "producing good or helpful results",
         "synonyms": ["advantageous", "helpful", "favorable"],
@@ -149,6 +153,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "component",
+        "phonetic": "kəmˈpoʊnənt",
+        "translation": "组成部分",
         "difficulty": "foundation",
         "definition": "one part of a larger system, machine, or idea",
         "synonyms": ["element", "part", "segment"],
@@ -158,6 +164,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "contrast",
+        "phonetic": "ˈkɒntræst",
+        "translation": "对比；差异",
         "difficulty": "foundation",
         "definition": "a noticeable difference between people or things",
         "synonyms": ["difference", "distinction", "juxtapose"],
@@ -167,6 +175,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "decline",
+        "phonetic": "dɪˈklaɪn",
+        "translation": "下降；衰退",
         "difficulty": "foundation",
         "definition": "a gradual decrease in amount, quality, or importance",
         "synonyms": ["decrease", "drop", "deteriorate"],
@@ -176,6 +186,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "emphasize",
+        "phonetic": "ˈemfəˌsaɪz",
+        "translation": "强调",
         "difficulty": "foundation",
         "definition": "to give special importance to something",
         "synonyms": ["highlight", "stress", "underline"],
@@ -185,6 +197,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "expand",
+        "phonetic": "ɪkˈspænd",
+        "translation": "扩大；扩展",
         "difficulty": "foundation",
         "definition": "to become larger in size, number, or amount",
         "synonyms": ["broaden", "enlarge", "extend"],
@@ -194,6 +208,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "factor",
+        "phonetic": "ˈfæktər",
+        "translation": "因素",
         "difficulty": "foundation",
         "definition": "something that influences or causes a situation",
         "synonyms": ["element", "consideration", "variable"],
@@ -203,6 +219,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "income",
+        "phonetic": "ˈɪnkʌm",
+        "translation": "收入",
         "difficulty": "foundation",
         "definition": "money that someone earns or receives, especially on a regular basis",
         "synonyms": ["earnings", "revenue", "salary"],
@@ -212,6 +230,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "trend",
+        "phonetic": "trend",
+        "translation": "趋势",
         "difficulty": "foundation",
         "definition": "a general direction of change or development",
         "synonyms": ["pattern", "movement", "trajectory"],
@@ -221,6 +241,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "mitigate",
+        "phonetic": "ˈmɪtɪˌɡeɪt",
+        "translation": "缓解；减轻",
         "difficulty": "advanced",
         "definition": "to make something less harmful, unpleasant, or serious",
         "synonyms": ["reduce", "alleviate", "lessen"],
@@ -230,6 +252,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "plausible",
+        "phonetic": "ˈplɔːzəbl",
+        "translation": "貌似合理的",
         "difficulty": "advanced",
         "definition": "seeming likely to be true or reasonable",
         "synonyms": ["reasonable", "credible", "believable"],
@@ -239,6 +263,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "resilient",
+        "phonetic": "rɪˈzɪliənt",
+        "translation": "有弹性的；适应力强的",
         "difficulty": "advanced",
         "definition": "able to quickly recover from difficult conditions",
         "synonyms": ["tough", "adaptable", "hardy"],
@@ -248,6 +274,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "consolidate",
+        "phonetic": "kənˈsɑːləˌdeɪt",
+        "translation": "巩固；整合",
         "difficulty": "advanced",
         "definition": "to combine things in order to make them stronger or more effective",
         "synonyms": ["strengthen", "combine", "merge"],
@@ -257,6 +285,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "advocate",
+        "phonetic": "ˈædvəkeɪt",
+        "translation": "提倡；主张",
         "difficulty": "advanced",
         "definition": "to publicly support a particular cause or policy",
         "synonyms": ["support", "champion", "promote"],
@@ -266,6 +296,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "fluctuate",
+        "phonetic": "ˈflʌktʃueɪt",
+        "translation": "波动",
         "difficulty": "advanced",
         "definition": "to change frequently in size, amount, or quality",
         "synonyms": ["vary", "oscillate", "shift"],
@@ -275,6 +307,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "incentive",
+        "phonetic": "ɪnˈsentɪv",
+        "translation": "激励；刺激",
         "difficulty": "advanced",
         "definition": "something that encourages a person to do something",
         "synonyms": ["motivation", "stimulus", "encouragement"],
@@ -284,6 +318,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "allocate",
+        "phonetic": "ˈæləˌkeɪt",
+        "translation": "分配",
         "difficulty": "advanced",
         "definition": "to officially give something to someone or for a particular purpose",
         "synonyms": ["distribute", "assign", "apportion"],
@@ -293,6 +329,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "sustainable",
+        "phonetic": "səˈsteɪnəbl",
+        "translation": "可持续的",
         "difficulty": "advanced",
         "definition": "able to continue over a period of time without causing damage",
         "synonyms": ["viable", "enduring", "renewable"],
@@ -302,6 +340,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "constraint",
+        "phonetic": "kənˈstreɪnt",
+        "translation": "限制",
         "difficulty": "advanced",
         "definition": "a limitation or restriction that controls what you can do",
         "synonyms": ["limitation", "restriction", "restraint"],
@@ -311,6 +351,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "ubiquitous",
+        "phonetic": "juːˈbɪkwɪtəs",
+        "translation": "无处不在的",
         "difficulty": "expert",
         "definition": "seeming to be everywhere or in several places at the same time",
         "synonyms": ["widespread", "omnipresent", "pervasive"],
@@ -320,6 +362,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "precipitous",
+        "phonetic": "prɪˈsɪpɪtəs",
+        "translation": "陡峭的；骤然的",
         "difficulty": "expert",
         "definition": "sudden and dramatic, or very steep",
         "synonyms": ["steep", "abrupt", "sudden"],
@@ -329,6 +373,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "alleviate",
+        "phonetic": "əˈliːvieɪt",
+        "translation": "缓解",
         "difficulty": "expert",
         "definition": "to make something bad such as pain or problems less severe",
         "synonyms": ["ease", "relieve", "soothe"],
@@ -338,6 +384,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "paradigm",
+        "phonetic": "ˈpærədaɪm",
+        "translation": "范式；典范",
         "difficulty": "expert",
         "definition": "a typical example or model of something",
         "synonyms": ["model", "framework", "archetype"],
@@ -347,6 +395,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "infrastructure",
+        "phonetic": "ˈɪnfrəˌstrʌktʃər",
+        "translation": "基础设施",
         "difficulty": "expert",
         "definition": "the basic systems and services that are necessary for a country or organization",
         "synonyms": ["framework", "facilities", "foundation"],
@@ -356,6 +406,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "repercussion",
+        "phonetic": "ˌriːpərˈkʌʃən",
+        "translation": "影响；反响",
         "difficulty": "expert",
         "definition": "a usually bad effect that happens after something",
         "synonyms": ["consequence", "aftermath", "impact"],
@@ -365,6 +417,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "substantiate",
+        "phonetic": "səbˈstænʃieɪt",
+        "translation": "证实",
         "difficulty": "expert",
         "definition": "to provide evidence to prove that something is true",
         "synonyms": ["prove", "validate", "corroborate"],
@@ -374,6 +428,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "transcend",
+        "phonetic": "trænˈsend",
+        "translation": "超越",
         "difficulty": "expert",
         "definition": "to rise above or go beyond the limits of something",
         "synonyms": ["surpass", "exceed", "rise above"],
@@ -383,6 +439,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "volatile",
+        "phonetic": "ˈvɒlətəl",
+        "translation": "不稳定的",
         "difficulty": "expert",
         "definition": "likely to change suddenly and unexpectedly, especially by getting worse",
         "synonyms": ["unstable", "unpredictable", "turbulent"],
@@ -392,6 +450,8 @@ IELTS_VOCABULARY: List[Dict[str, Any]] = [
     },
     {
         "word": "conundrum",
+        "phonetic": "kəˈnʌndrəm",
+        "translation": "难题",
         "difficulty": "expert",
         "definition": "a difficult problem that seems to have no solution",
         "synonyms": ["puzzle", "dilemma", "enigma"],
@@ -458,6 +518,8 @@ def _build_definition_question(target: Dict[str, Any]) -> Dict[str, Any]:
         "strategy": "先用自己的话复述，再排除语气或范围不匹配的选项。",
         "supporting": {
             "keyword": target["word"],
+            "phonetic": target.get("phonetic"),
+            "translation": target.get("translation"),
             "quickTip": target.get("usage_tip"),
             "collocations": target.get("collocations", [])[:3],
         },
@@ -504,6 +566,8 @@ def _build_synonym_question(target: Dict[str, Any]) -> Dict[str, Any]:
         "strategy": "比较语气强度与使用场景，筛掉过于口语或过于极端的选项。",
         "supporting": {
             "keyword": target["word"],
+            "phonetic": target.get("phonetic"),
+            "translation": target.get("translation"),
             "quickTip": "关注搭配对象：人、政策或抽象概念。",
             "collocations": target.get("collocations", [])[:2],
         },
@@ -537,6 +601,8 @@ def _build_usage_question(target: Dict[str, Any]) -> Dict[str, Any]:
         "strategy": "观察空格前后的搭配，判断词性与语义是否匹配。",
         "supporting": {
             "keyword": target["word"],
+            "phonetic": target.get("phonetic"),
+            "translation": target.get("translation"),
             "quickTip": target.get("usage_tip"),
             "collocations": target.get("collocations", [])[:2],
         },
@@ -633,6 +699,8 @@ def generate_round(payload: GenerateRoundRequest) -> Dict[str, Any]:
             "round_id": round_id,
             "correct_option_id": correct_option_id,
             "word": target["word"],
+            "phonetic": target.get("phonetic"),
+            "translation": target.get("translation"),
             "definition": target["definition"],
             "synonyms": target.get("synonyms", []),
             "example": target.get("example"),
@@ -702,6 +770,8 @@ def verify_answer(payload: VerifyRoundRequest) -> Dict[str, Any]:
 
     detail = {
         "word": answer_data.get("word"),
+        "phonetic": answer_data.get("phonetic"),
+        "translation": answer_data.get("translation"),
         "definition": answer_data.get("definition"),
         "synonyms": answer_data.get("synonyms", []),
         "example": answer_data.get("example"),
