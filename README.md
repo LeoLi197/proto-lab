@@ -53,6 +53,12 @@ flashmvp 是一个专为快速产品验证设计的混合云框架。它将 `fla
 
   - 功能模块（`features/`）保持高度独立，新增功能不影响平台核心，便于团队协作和 LLM 辅助开发。
 
+### 🔄 Firecrawl Markdown 导出器（新增）
+
+  - 后端新增 `firecrawl_exporter` 功能模块，调用开源项目 [Firecrawl](https://github.com/firecrawl/firecrawl) 的爬虫能力，将指定站点的当前页面及子页面转化为 Markdown。
+  - 前端提供独立的「🪄 Firecrawl Markdown 导出器」界面，输入网址即可发起任务、追踪进度并下载归档 ZIP 文件。
+  - 通过环境变量配置 `FIRECRAWL_API_KEY`（必填）和 `FIRECRAWL_BASE_URL`（选填，默认官方云服务）即可完成接入，不影响现有功能。
+
 ## 🏗️ 技术架构
 
 1.  **用户请求** 首先到达 **Cloudflare Pages**。
