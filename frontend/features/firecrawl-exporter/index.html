@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🪄 Firecrawl Markdown 导出器</title>
+    <link rel="stylesheet" href="../../style.css">
+    <style>
+        :root {
+            --exporter-bg: radial-gradient(circle at 12% 24%, rgba(56, 189, 248, 0.18), transparent 60%),
+                           radial-gradient(circle at 88% 0%, rgba(129, 140, 248, 0.16), transparent 62%),
+                           linear-gradient(180deg, #080b16 0%, #0c1021 45%, #080b16 100%);
+            --exporter-card: rgba(12, 17, 34, 0.78);
+            --exporter-border: rgba(148, 163, 255, 0.18);
+            --exporter-highlight: rgba(56, 189, 248, 0.22);
+            --exporter-text: rgba(226, 232, 255, 0.92);
+            --exporter-muted: rgba(203, 213, 225, 0.68);
+            --exporter-success: #34d399;
+            --exporter-danger: #f87171;
+            --exporter-warning: #fbbf24;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            background: var(--exporter-bg);
+            color: var(--exporter-text);
+        }
+
+        .exporter-shell {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 32px 22px 96px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .hero-card {
+            position: relative;
+            border-radius: 28px;
+            padding: 32px;
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(129, 140, 248, 0.18));
+            border: 1px solid rgba(148, 163, 255, 0.28);
+            overflow: hidden;
+        }
+
+        .hero-card::after {
+            content: "";
+            position: absolute;
+            inset: -120px;
+            background: radial-gradient(circle at 70% 10%, rgba(129, 140, 248, 0.35), transparent 60%);
+            filter: blur(80px);
+            z-index: 0;
+        }
+
+        .hero-card > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.55);
+            color: rgba(224, 242, 254, 0.92);
+            font-size: 0.92rem;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        .hero-card h1 {
+            font-size: clamp(1.8rem, 4vw, 2.6rem);
+            margin: 18px 0 12px;
+            line-height: 1.2;
+            font-weight: 700;
+        }
+
+        .hero-card p {
+            margin: 0;
+            max-width: 620px;
+            color: rgba(226, 232, 255, 0.78);
+            line-height: 1.7;
+        }
+
+        .panels {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 22px;
+        }
+
+        .panel {
+            background: var(--exporter-card);
+            border: 1px solid var(--exporter-border);
+            border-radius: 20px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            box-shadow: 0 30px 45px rgba(2, 6, 23, 0.55);
+        }
+
+        .panel h2 {
+            margin: 0;
+            font-size: 1.15rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .panel label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        input[type="url"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 255, 0.24);
+            background: rgba(12, 19, 38, 0.82);
+            color: var(--exporter-text);
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .checkbox-row {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .checkbox-row label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+            color: var(--exporter-muted);
+        }
+
+        .checkbox-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        button.primary {
+            border: none;
+            border-radius: 12px;
+            padding: 12px 22px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            color: #0b1120;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            box-shadow: 0 16px 30px rgba(56, 189, 248, 0.35);
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        button.primary:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        button.secondary {
+            border-radius: 12px;
+            padding: 12px 22px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            color: var(--exporter-text);
+            background: rgba(148, 163, 255, 0.16);
+            border: 1px solid rgba(148, 163, 255, 0.25);
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        button.secondary:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        button.primary:not(:disabled):hover,
+        button.secondary:not(:disabled):hover {
+            transform: translateY(-2px);
+        }
+
+        .status-card {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 20px;
+            border: 1px solid rgba(148, 163, 255, 0.18);
+            padding: 20px 22px;
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .status-badge {
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            background: rgba(148, 163, 255, 0.14);
+            color: var(--exporter-text);
+        }
+
+        .status-badge.info {
+            background: rgba(148, 163, 255, 0.18);
+            color: var(--exporter-text);
+        }
+
+        .status-badge.success {
+            background: rgba(52, 211, 153, 0.18);
+            color: var(--exporter-success);
+        }
+
+        .status-badge.warning {
+            background: rgba(251, 191, 36, 0.22);
+            color: var(--exporter-warning);
+        }
+
+        .status-badge.danger {
+            background: rgba(248, 113, 113, 0.22);
+            color: var(--exporter-danger);
+        }
+
+        .status-details {
+            color: var(--exporter-muted);
+            line-height: 1.6;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 255, 0.12);
+        }
+
+        .history-table thead {
+            background: rgba(15, 23, 42, 0.75);
+            color: rgba(226, 232, 255, 0.78);
+        }
+
+        .history-table th,
+        .history-table td {
+            padding: 14px 16px;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        .history-table tbody tr:nth-child(even) {
+            background: rgba(12, 19, 38, 0.55);
+        }
+
+        .history-table tbody tr:nth-child(odd) {
+            background: rgba(15, 23, 42, 0.42);
+        }
+
+        .history-table tbody tr:hover {
+            background: rgba(56, 189, 248, 0.12);
+        }
+
+        .pill {
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        .pill.success { background: rgba(52, 211, 153, 0.16); color: var(--exporter-success); }
+        .pill.warning { background: rgba(251, 191, 36, 0.18); color: var(--exporter-warning); }
+        .pill.danger { background: rgba(248, 113, 113, 0.2); color: var(--exporter-danger); }
+        .pill.info { background: rgba(148, 163, 255, 0.2); color: var(--exporter-text); }
+
+        .hint {
+            font-size: 0.85rem;
+            color: rgba(203, 213, 225, 0.72);
+        }
+
+        @media (max-width: 768px) {
+            .hero-card {
+                padding: 24px;
+            }
+
+            .panels {
+                grid-template-columns: 1fr;
+            }
+
+            .actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            button.primary,
+            button.secondary {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="exporter-shell">
+        <section class="hero-card">
+            <div class="hero-badge">🪄 Firecrawl Markdown Exporter</div>
+            <h1>几次点击即可导出整站 Markdown</h1>
+            <p>
+                输入任意网页地址，我们将通过开源项目 <strong>Firecrawl</strong> 自动爬取当前页面
+                及其子页面，并生成结构化的 Markdown 归档。导出过程与平台其他功能完全隔离，
+                让你可以放心在同一套演示环境中迭代更多创意。
+            </p>
+        </section>
+
+        <section class="panels">
+            <article class="panel">
+                <h2>1️⃣ 配置目标站点</h2>
+                <div>
+                    <label for="targetUrl">目标网址</label>
+                    <input type="url" id="targetUrl" placeholder="https://example.com" required>
+                    <p class="hint">请输入以 http 或 https 开头的完整地址。</p>
+                </div>
+                <div class="grid-options">
+                    <label for="maxDepth">抓取深度 (0-8)</label>
+                    <input type="number" id="maxDepth" min="0" max="8" value="2">
+                </div>
+                <div class="grid-options">
+                    <label for="maxPages">页面数量上限 (1-200)</label>
+                    <input type="number" id="maxPages" min="1" max="200" value="25">
+                </div>
+                <div class="checkbox-row">
+                    <label><input type="checkbox" id="includeSubdomains"> 同时包含子域名</label>
+                    <label><input type="checkbox" id="ignoreSitemap"> 忽略 sitemap.xml 提示</label>
+                </div>
+                <div class="actions">
+                    <button class="primary" id="startBtn">🚀 开始解析</button>
+                    <button class="secondary" id="downloadBtn" disabled>⬇️ 下载 Markdown</button>
+                </div>
+                <p class="hint">启动后系统会自动轮询 Firecrawl 任务，完成即可下载归档 ZIP。</p>
+            </article>
+
+            <article class="panel">
+                <h2>2️⃣ 任务进度</h2>
+                <div class="status-card">
+                    <div class="status-row">
+                        <span class="status-badge info" id="statusBadge">尚未开始</span>
+                        <span id="pageCount" class="hint">—</span>
+                    </div>
+                    <div class="status-details" id="statusDetails">
+                        准备就绪。提交任务后这里将展示实时进度与说明。
+                    </div>
+                    <div class="status-details hint" id="jobMeta"></div>
+                </div>
+            </article>
+        </section>
+
+        <section class="panel">
+            <h2>3️⃣ 历史记录</h2>
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>网址</th>
+                        <th>状态</th>
+                        <th>页面数</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody">
+                    <tr>
+                        <td colspan="5" class="hint">暂无任务，赶快试试看吧！</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </div>
+
+    <script>
+        const API_PREFIX = '/api/firecrawl-exporter';
+        const startBtn = document.getElementById('startBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusBadge = document.getElementById('statusBadge');
+        const statusDetails = document.getElementById('statusDetails');
+        const pageCountEl = document.getElementById('pageCount');
+        const jobMeta = document.getElementById('jobMeta');
+        const historyBody = document.getElementById('historyBody');
+
+        let currentJobId = null;
+        let currentJobUrl = null;
+        let pollTimer = null;
+        const history = [];
+
+        function setBadge(status, text) {
+            statusBadge.className = 'status-badge ' + status;
+            statusBadge.textContent = text;
+        }
+
+        function resetStatus() {
+            setBadge('info', '尚未开始');
+            statusDetails.textContent = '准备就绪。提交任务后这里将展示实时进度与说明。';
+            pageCountEl.textContent = '—';
+            jobMeta.textContent = '';
+            downloadBtn.disabled = true;
+        }
+
+        function formatTime(date) {
+            return new Intl.DateTimeFormat('zh-CN', {
+                hour12: false,
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            }).format(date);
+        }
+
+        function appendHistory(entry) {
+            history.unshift(entry);
+            renderHistory();
+        }
+
+        function renderHistory() {
+            if (history.length === 0) {
+                historyBody.innerHTML = '<tr><td colspan="5" class="hint">暂无任务，赶快试试看吧！</td></tr>';
+                return;
+            }
+
+            historyBody.innerHTML = history.map(item => `
+                <tr>
+                    <td>${item.time}</td>
+                    <td><a href="${item.url}" target="_blank" rel="noopener">${item.url}</a></td>
+                    <td><span class="pill ${item.statusClass}">${item.statusLabel}</span></td>
+                    <td>${item.pageCount ?? '—'}</td>
+                    <td>
+                        ${item.downloadUrl ? `<a href="#" data-job="${item.jobId}" class="download-link">下载</a>` : '<span class="hint">等待中</span>'}
+                    </td>
+                </tr>
+            `).join('');
+
+            document.querySelectorAll('.download-link').forEach(link => {
+                link.addEventListener('click', async (event) => {
+                    event.preventDefault();
+                    const jobId = event.currentTarget.dataset.job;
+                    await downloadArchive(jobId);
+                });
+            });
+        }
+
+        function updateHistoryEntry(jobId, updates) {
+            const index = history.findIndex(item => item.jobId === jobId);
+            if (index >= 0) {
+                history[index] = { ...history[index], ...updates };
+                renderHistory();
+            }
+        }
+
+        async function startCrawl() {
+            const url = document.getElementById('targetUrl').value.trim();
+            const maxDepth = Number(document.getElementById('maxDepth').value);
+            const maxPages = Number(document.getElementById('maxPages').value);
+            const includeSubdomains = document.getElementById('includeSubdomains').checked;
+            const ignoreSitemap = document.getElementById('ignoreSitemap').checked;
+
+            if (!url) {
+                alert('请先输入要解析的目标网址。');
+                return;
+            }
+
+            resetStatus();
+            setBadge('warning', '提交中...');
+            statusDetails.textContent = '正在创建 Firecrawl 任务，请稍候。';
+            startBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_PREFIX}/jobs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url,
+                        max_depth: maxDepth,
+                        max_pages: maxPages,
+                        include_subdomains: includeSubdomains,
+                        ignore_sitemap: ignoreSitemap
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorPayload = await response.json().catch(() => ({}));
+                    throw new Error(errorPayload.detail || 'Firecrawl 任务创建失败');
+                }
+
+                const data = await response.json();
+                currentJobId = data.job_id;
+                currentJobUrl = url;
+                setBadge('warning', '已排队');
+                statusDetails.textContent = data.detail || 'Firecrawl 正在排队处理中。';
+                jobMeta.textContent = `任务编号：${currentJobId}`;
+
+                appendHistory({
+                    jobId: currentJobId,
+                    url,
+                    time: formatTime(new Date()),
+                    statusLabel: '排队中',
+                    statusClass: 'warning',
+                    pageCount: null,
+                    downloadUrl: null
+                });
+
+                schedulePolling(data.poll_after_seconds ?? 2.5);
+            } catch (error) {
+                console.error(error);
+                setBadge('danger', '提交失败');
+                statusDetails.textContent = error.message || 'Firecrawl 任务提交失败。';
+                startBtn.disabled = false;
+            }
+        }
+
+        function schedulePolling(intervalSeconds) {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+            }
+
+            pollTimer = setInterval(() => pollStatus(), Math.max(intervalSeconds * 1000, 2000));
+        }
+
+        async function pollStatus() {
+            if (!currentJobId) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_PREFIX}/jobs/${currentJobId}`);
+                if (!response.ok) {
+                    throw new Error('查询任务状态失败');
+                }
+
+                const data = await response.json();
+                const normalized = data.status;
+                const firecrawlStatus = data.firecrawl_status;
+                const pages = data.page_count ?? null;
+
+                pageCountEl.textContent = pages ? `${pages} 个页面` : '—';
+                jobMeta.textContent = `任务编号：${data.job_id}${data.last_updated ? ` ｜ Firecrawl 更新时间：${data.last_updated}` : ''}`;
+                statusDetails.textContent = data.detail || `Firecrawl 状态：${firecrawlStatus}`;
+
+                let statusLabel = '进行中';
+                let statusClass = 'warning';
+
+                if (normalized === 'queued') {
+                    setBadge('warning', '排队中');
+                    statusLabel = '排队中';
+                } else if (normalized === 'running') {
+                    setBadge('warning', '解析中');
+                    statusLabel = '解析中';
+                } else if (normalized === 'completed') {
+                    setBadge('success', '已完成');
+                    statusLabel = '已完成';
+                    statusClass = 'success';
+                    downloadBtn.disabled = false;
+                    clearInterval(pollTimer);
+                    pollTimer = null;
+                    startBtn.disabled = false;
+                } else if (normalized === 'failed') {
+                    setBadge('danger', '失败');
+                    statusLabel = '失败';
+                    statusClass = 'danger';
+                    downloadBtn.disabled = true;
+                    clearInterval(pollTimer);
+                    pollTimer = null;
+                    startBtn.disabled = false;
+                } else {
+                    setBadge('info', firecrawlStatus);
+                    statusLabel = firecrawlStatus;
+                    statusClass = 'info';
+                }
+
+                updateHistoryEntry(currentJobId, {
+                    statusLabel,
+                    statusClass,
+                    pageCount: pages,
+                    downloadUrl: data.download_url || null
+                });
+            } catch (error) {
+                console.error(error);
+                setBadge('danger', '状态异常');
+                statusDetails.textContent = error.message || '获取任务状态失败，请稍后重试。';
+                startBtn.disabled = false;
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        async function downloadArchive(jobId = currentJobId) {
+            if (!jobId) {
+                alert('暂无可下载的任务。');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_PREFIX}/jobs/${jobId}/download`);
+                if (!response.ok) {
+                    const payload = await response.json().catch(() => ({}));
+                    throw new Error(payload.detail || '下载失败，请稍后再试。');
+                }
+
+                const blob = await response.blob();
+                const disposition = response.headers.get('Content-Disposition') || '';
+                const match = disposition.match(/filename=([^;]+)/i);
+                const filename = match ? decodeURIComponent(match[1]) : `firecrawl-export-${Date.now()}.zip`;
+
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename.replaceAll('"', '');
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        startBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            startCrawl();
+        });
+
+        downloadBtn.addEventListener('click', async (event) => {
+            event.preventDefault();
+            await downloadArchive();
+        });
+
+        resetStatus();
+    </script>
+</body>
+</html>

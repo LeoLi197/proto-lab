@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from features.core_api.router import router as core_api_router
 from features.chess_academy.router import router as chess_academy_router
 from features.ielts_vocab_game.router import router as ielts_vocab_game_router
+from features.firecrawl_exporter.router import router as firecrawl_exporter_router
 # ==============================================================================
 # [示例] 如何添加新的功能模块
 # ------------------------------------------------------------------------------
@@ -57,6 +58,8 @@ app.include_router(chess_academy_router, prefix="/api")
 print("✅ Successfully loaded feature: chess_academy")
 app.include_router(ielts_vocab_game_router, prefix="/api")
 print("✅ Successfully loaded feature: ielts_vocab_game")
+app.include_router(firecrawl_exporter_router, prefix="/api")
+print("✅ Successfully loaded feature: firecrawl_exporter")
 
 # ==============================================================================
 # [示例] 如何注册新的功能模块路由
