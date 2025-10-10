@@ -60,6 +60,12 @@ const FEATURES = [
         isFullPath: true
     },
     {
+        path: 'firecrawl-exporter/index.html',
+        name: '🪄 Firecrawl Markdown 导出器',
+        description: '输入网址，一键抓取当前站点并导出结构化 Markdown 归档。',
+        isFullPath: true
+    },
+    {
         path: 'ielts-vocab-game/index.html',
         name: '🛰️ IELTS 词汇能量舱',
         description: '成人向雅思词汇学习对战，覆盖多难度与多题型的沉浸式训练体验。',
