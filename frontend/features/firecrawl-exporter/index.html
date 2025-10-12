@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🪄 Firecrawl Markdown 导出器</title>
+    <title>🪄 Markdown 归档工作台</title>
     <link rel="stylesheet" href="../../style.css">
     <style>
         :root {
@@ -330,11 +330,11 @@
 <body>
     <div class="exporter-shell">
         <section class="hero-card">
-            <div class="hero-badge">🪄 Firecrawl Markdown Exporter</div>
-            <h1>Firecrawl Markdown 归档工作台</h1>
+            <div class="hero-badge">🪄 Markdown Export Hub</div>
+            <h1>多源 Markdown 归档工作台</h1>
             <p>
-                基于开源 <strong>Firecrawl</strong> 引擎，自动遍历目标站点并生成结构化的 Markdown 资料包。
-                支持多层级页面采集、任务状态追踪与 ZIP 一键导出，帮助团队在统一的演示环境中沉淀可复用内容资产。
+                内置自研的结构化采集流程，可自动遍历目标站点并生成可编辑的 Markdown 资料包。
+                支持多层级页面采集、任务状态追踪与 ZIP 一键导出，帮助团队在统一环境中沉淀可复用的知识资产。
             </p>
         </section>
 
@@ -362,7 +362,7 @@
                     <button class="primary" id="startBtn">🚀 开始解析</button>
                     <button class="secondary" id="downloadBtn" disabled>⬇️ 下载 Markdown</button>
                 </div>
-                <p class="hint">启动后系统会自动轮询 Firecrawl 任务，完成即可下载归档 ZIP。</p>
+                <p class="hint">启动后系统会自动轮询任务进度，完成即可下载归档 ZIP。</p>
             </article>
 
             <article class="panel">
@@ -494,7 +494,7 @@
 
             resetStatus();
             setBadge('warning', '提交中...');
-            statusDetails.textContent = '正在创建 Firecrawl 任务，请稍候。';
+            statusDetails.textContent = '正在创建归档任务，请稍候。';
             startBtn.disabled = true;
 
             try {
@@ -512,14 +512,14 @@
 
                 if (!response.ok) {
                     const errorPayload = await response.json().catch(() => ({}));
-                    throw new Error(errorPayload.detail || 'Firecrawl 任务创建失败');
+                    throw new Error(errorPayload.detail || '任务创建失败');
                 }
 
                 const data = await response.json();
                 currentJobId = data.job_id;
                 currentJobUrl = url;
                 setBadge('warning', '已排队');
-                statusDetails.textContent = data.detail || 'Firecrawl 正在排队处理中。';
+                statusDetails.textContent = data.detail || '归档引擎正在排队处理中。';
                 jobMeta.textContent = `任务编号：${currentJobId}`;
 
                 appendHistory({
@@ -536,7 +536,7 @@
             } catch (error) {
                 console.error(error);
                 setBadge('danger', '提交失败');
-                statusDetails.textContent = error.message || 'Firecrawl 任务提交失败。';
+                statusDetails.textContent = error.message || '任务提交失败。';
                 startBtn.disabled = false;
             }
         }
@@ -568,8 +568,8 @@
                 const pages = data.page_count ?? null;
 
                 pageCountEl.textContent = pages ? `${pages} 个页面` : '—';
-                jobMeta.textContent = `任务编号：${data.job_id}${data.last_updated ? ` ｜ Firecrawl 更新时间：${data.last_updated}` : ''}`;
-                statusDetails.textContent = data.detail || `Firecrawl 状态：${firecrawlStatus}`;
+                jobMeta.textContent = `任务编号：${data.job_id}${data.last_updated ? ` ｜ 引擎更新时间：${data.last_updated}` : ''}`;
+                statusDetails.textContent = data.detail || `归档引擎状态：${firecrawlStatus}`;
 
                 let statusLabel = '进行中';
                 let statusClass = 'warning';
@@ -634,7 +634,7 @@
                 const blob = await response.blob();
                 const disposition = response.headers.get('Content-Disposition') || '';
                 const match = disposition.match(/filename=([^;]+)/i);
-                const filename = match ? decodeURIComponent(match[1]) : `firecrawl-export-${Date.now()}.zip`;
+                const filename = match ? decodeURIComponent(match[1]) : `markdown-export-${Date.now()}.zip`;
 
                 const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');

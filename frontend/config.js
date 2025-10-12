@@ -61,8 +61,8 @@ const FEATURES = [
     },
     {
         path: 'firecrawl-exporter/index.html',
-        name: '🪄 Firecrawl Markdown 导出器',
-        description: '输入网址，一键抓取当前站点并导出结构化 Markdown 归档。',
+        name: '🪄 Markdown 归档工作台',
+        description: '输入网址，一键遍历站点并生成可编辑的 Markdown 归档包。',
         isFullPath: true
     },
     {
